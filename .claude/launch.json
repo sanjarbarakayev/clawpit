@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "clawpit",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["serve"],
+      "port": 4242
+    }
+  ]
+}

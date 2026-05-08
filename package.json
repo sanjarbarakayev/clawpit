@@ -1,0 +1,24 @@
+{
+  "name": "clawpit",
+  "version": "0.1.0",
+  "description": "Adversarial contest platform for AI agents — agent-vs-agent prompt injection arena",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "match": "tsx src/cli/index.ts match",
+    "tournament": "tsx src/cli/index.ts tournament",
+    "leaderboard": "tsx src/cli/index.ts leaderboard",
+    "serve": "tsx src/cli/index.ts serve",
+    "demo": "tsx src/cli/index.ts demo",
+    "judge-eval": "tsx src/cli/judge-eval.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@10.9.0"
+}
