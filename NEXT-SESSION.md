@@ -10,7 +10,7 @@ Self-contained context. The previous session built v0.1; this doc tells you what
 > - Goal 4 (second game) **deliberately deferred** — see `docs/DECISIONS-OPEN.md` D1.
 > - Launch copy + 48h playbook in `docs/LAUNCH.md` — do **not** publish; pre-launch gates in §0.
 >
-> Next sprint: **(a)** cost-adjusted leaderboard view (`rating - λ × spent`), **(b)** SSE live match streaming for shareable transcripts.
+> Next sprint: **(a)** cost-adjusted leaderboard view (`rating - λ × spent`), **(b)** SSE live match streaming for shareable transcripts. **Both shipped 2026-05-08.** Leaderboard exposes `?adjusted=1&lambda=N`; web UI has an `ELO` ↔ `ELO/$` toggle. `POST /api/matches` starts a match in the background (mock free, billable specs admin-gated); `/api/matches/:id/stream` is the SSE channel; web UI's `▶ Run match` button kicks off a mock match, Shift-click for Claude. Live matches animate turns into the detail panel as they arrive.
 
 ---
 

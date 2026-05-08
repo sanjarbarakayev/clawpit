@@ -225,7 +225,59 @@ table .cost { color: var(--accent); font-family: var(--mono); }
   vertical-align: middle;
   text-transform: uppercase;
 }
-.admin-toggle {
+.run-match {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: var(--def);
+  background: transparent;
+  border: 1px solid var(--def);
+  border-radius: 3px;
+  padding: 2px 8px;
+  margin-left: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  float: right;
+}
+.run-match:hover { background: rgba(74, 222, 128, 0.12); }
+
+.live-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--bg);
+  background: var(--atk);
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.finished-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--def);
+  border: 1px solid var(--def);
+  padding: 1px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.error-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  padding: 1px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.admin-toggle, .rank-toggle {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.6px;
@@ -234,11 +286,15 @@ table .cost { color: var(--accent); font-family: var(--mono); }
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 2px 7px;
-  margin-left: 8px;
+  margin-left: 6px;
   cursor: pointer;
   text-transform: uppercase;
 }
-.admin-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.admin-toggle:hover, .rank-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.rank-toggle[data-mode="adjusted"] { color: var(--accent); border-color: var(--accent); }
+.header-controls { float: right; }
+.elo-adj { color: var(--accent); }
+.elo-base { color: var(--fg-muted); font-size: 10px; margin-left: 4px; }
 .transcript { display: flex; flex-direction: column; gap: 10px; }
 .turn {
   border-left: 3px solid;

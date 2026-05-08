@@ -80,13 +80,28 @@ Simple, inspectable, version-controllable for a v0. Swap to SQLite later if matc
 
 ## Web UI
 
-Single-page dashboard at `http://localhost:4242`. Three columns:
+Single-page dashboard at `http://localhost:4242`. Three columns + a few interactive controls:
 
-- **Leaderboard** — ranked by ELO, with attacker/defender W-L split.
-- **Recent matches** — clickable list, color-coded by winner (red=attacker, green=defender).
-- **Match detail** — transcript with role-colored turns, plus the secret that was at stake.
+- **Leaderboard** — ranked by ELO with attacker/defender W-L split + lifetime spend column. Toggle the **`ELO`** button to switch to **cost-adjusted ranking** (`rating − λ × totalCostUsd`, λ=100 by default). Cheap-but-stoic defenders look very good in cost-adjusted mode; expensive attackers look very bad.
+- **Recent matches** — clickable list, color-coded by winner (red=attacker, green=defender). Click **`▶ Run match`** to launch a free mock-vs-mock match in the background; hold Shift to launch a Claude-vs-Claude match (admin token required — set via the `reveal mode` button).
+- **Match detail** — transcript with role-colored turns. For *live* matches the panel subscribes to a Server-Sent-Events stream (`/api/matches/:id/stream`) and animates each turn in as it happens. The secret is `[REDACTED]` unless reveal mode is on.
 
 Auto-refreshes every 5 seconds. Plain HTML+JS+CSS — no build step.
+
+## API surface
+
+```
+GET  /api/health                       { ok, adminEnabled }
+GET  /api/leaderboard                  ranked by ELO
+GET  /api/leaderboard?adjusted=1&lambda=100   ranked by rating − λ × spent
+GET  /api/matches?limit=N              compact match list (no transcripts)
+GET  /api/matches/:id                  redacted match detail
+GET  /api/matches/:id?reveal=1         full detail (requires x-clawpit-admin-token)
+GET  /api/matches/:id/stream           Server-Sent Events for a live match
+GET  /api/live                         in-flight match registry
+POST /api/matches                      start a match: { attacker, defender, turns?, judge?, seed? }
+                                       — billable specs require admin token
+```
 
 ## Leak detection (zero-cost by default)
 

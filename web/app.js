@@ -42,8 +42,24 @@ function fmtAgo(iso) {
   return `${Math.round(d / 86400_000)}d ago`;
 }
 
+const RANK_MODE_KEY = "clawpit_rank_mode";
+function getRankMode() {
+  return localStorage.getItem(RANK_MODE_KEY) === "adjusted" ? "adjusted" : "elo";
+}
+function setRankMode(mode) {
+  localStorage.setItem(RANK_MODE_KEY, mode);
+  const btn = $("#rank-toggle");
+  btn.dataset.mode = mode;
+  btn.textContent = mode === "adjusted" ? "ELO/$ (λ=100)" : "ELO";
+}
+
 async function loadLeaderboard() {
-  const res = await fetch("/api/leaderboard");
+  const mode = getRankMode();
+  const url =
+    mode === "adjusted"
+      ? "/api/leaderboard?adjusted=1&lambda=100"
+      : "/api/leaderboard";
+  const res = await fetch(url);
   const ratings = await res.json();
   const tbody = $("#leaderboard tbody");
   if (!ratings.length) {
@@ -53,10 +69,14 @@ async function loadLeaderboard() {
   tbody.innerHTML = ratings
     .map((r, i) => {
       const winRate = r.matches ? Math.round((r.wins / r.matches) * 100) : 0;
+      const eloCol =
+        mode === "adjusted"
+          ? `<td class="num elo elo-adj" title="ELO ${r.rating} − ${r.lambdaUsed} × $${(r.totalCostUsd ?? 0).toFixed(4)}">${r.costAdjustedRating ?? r.rating}<span class="elo-base"> (${r.rating})</span></td>`
+          : `<td class="num elo">${r.rating}</td>`;
       return `<tr class="rank-${i + 1}">
         <td>${i + 1}</td>
         <td>${escapeHtml(r.label)}</td>
-        <td class="num elo">${r.rating}</td>
+        ${eloCol}
         <td class="num">${r.wins}-${r.losses}<span style="color:var(--fg-muted)"> (${winRate}%)</span></td>
         <td class="num">${r.asAttackerWins}-${r.asAttackerLosses}</td>
         <td class="num">${r.asDefenderWins}-${r.asDefenderLosses}</td>
@@ -144,7 +164,157 @@ function renderUsageRow(m) {
     </div>`;
 }
 
+let liveStream = null;
+
+function closeLiveStream() {
+  if (liveStream) {
+    liveStream.close();
+    liveStream = null;
+  }
+}
+
+function liveDetailHTML({ attacker, defender, maxTurns, topic, turns, status, secret, judge, cost }) {
+  const liveBadge = status === "live" ? `<span class="live-badge">LIVE</span>` : "";
+  const finished = status === "finished" ? `<span class="finished-badge">FINISHED</span>` : "";
+  const errored = status === "error" ? `<span class="error-badge">ERROR</span>` : "";
+  const turnsHtml = turns
+    .map(
+      (t) => `<div class="turn ${t.role === "attacker" ? "atk" : "def"}">
+        <div class="turn-tag">T${t.turn} &middot; ${t.role}</div>
+        <div>${escapeHtml(t.content)}</div>
+      </div>`,
+    )
+    .join("");
+  return `
+    <div class="detail-header">
+      <div class="label">attacker</div><div><span class="atk-name">${escapeHtml(attacker)}</span></div>
+      <div class="label">defender</div><div><span class="def-name">${escapeHtml(defender)}</span></div>
+      <div class="label">topic</div><div>${escapeHtml(topic ?? "(pending)")}</div>
+      <div class="label">secret</div><div><span class="secret-redacted">${escapeHtml(secret ?? "[REDACTED]")}</span></div>
+      <div class="label">status</div><div>${liveBadge}${finished}${errored}</div>
+      <div class="label">turns</div><div>${turns.length}/${maxTurns}</div>
+      ${judge ? `<div class="label">judge</div><div><span class="judge-leak">${judge.tag}</span><span class="judge-meta">${escapeHtml(judge.model)} &middot; ${escapeHtml(judge.stage)}</span>${judge.evidence ? `<div class="judge-evidence">${escapeHtml(judge.evidence)}</div>` : ""}</div>` : ""}
+      ${cost ? `<div class="label">cost</div><div class="cost-row"><span class="cost-total">${fmtUsd(cost)}</span></div>` : ""}
+    </div>
+    <div class="transcript">${turnsHtml}</div>
+  `;
+}
+
+function streamLiveMatch(matchId, header) {
+  closeLiveStream();
+  activeMatchId = matchId;
+  $("#detail-title").textContent = `Match ${matchId.slice(0, 8)} · live`;
+
+  const state = {
+    attacker: header?.attacker ?? "(pending)",
+    defender: header?.defender ?? "(pending)",
+    maxTurns: header?.maxTurns ?? 6,
+    topic: undefined,
+    turns: [],
+    status: "live",
+    judge: null,
+    cost: 0,
+  };
+
+  const render = () => {
+    $("#detail").innerHTML = liveDetailHTML(state);
+  };
+  render();
+
+  const es = new EventSource(`/api/matches/${matchId}/stream`);
+  liveStream = es;
+
+  es.addEventListener("started", (ev) => {
+    const data = JSON.parse(ev.data);
+    state.attacker = data.attacker;
+    state.defender = data.defender;
+    state.maxTurns = data.maxTurns;
+    state.topic = data.topic === "(pending)" ? state.topic : data.topic;
+    render();
+  });
+
+  es.addEventListener("turn", (ev) => {
+    const data = JSON.parse(ev.data);
+    state.turns.push(data.entry);
+    render();
+  });
+
+  es.addEventListener("finished", (ev) => {
+    const data = JSON.parse(ev.data);
+    const m = data.result;
+    state.status = "finished";
+    state.maxTurns = m.maxTurns;
+    state.topic = m.topic;
+    if (m.judgeVerdict) {
+      state.judge = {
+        tag: m.judgeVerdict.leaked ? "LEAK" : "CLEAN",
+        model: m.judgeVerdict.model || "(noop)",
+        stage: m.judgeVerdict.stage,
+        evidence: m.judgeVerdict.evidence,
+      };
+    }
+    state.cost = m.usage?.totalCostUsd ?? 0;
+    render();
+    closeLiveStream();
+    // Refresh leaderboard + match list once the result is persisted.
+    setTimeout(refreshAll, 200);
+  });
+
+  es.addEventListener("error", (ev) => {
+    if (es.readyState === EventSource.CLOSED) {
+      // server closed; nothing to do
+    } else if (ev.data) {
+      const data = JSON.parse(ev.data);
+      state.status = "error";
+      state.judge = {
+        tag: "ERR",
+        model: "",
+        stage: "error",
+        evidence: data.message,
+      };
+      render();
+    }
+  });
+}
+
+async function startMatch() {
+  const token = getAdminToken();
+  // Default: free mock vs mock. Hold Shift to launch a Claude match (admin-only).
+  const useClaude = window.event?.shiftKey;
+  let body = {
+    attacker: "mock:atk:demo",
+    defender: "mock:def:demo",
+    judge: "decoder",
+  };
+  if (useClaude) {
+    if (!token) {
+      alert("Hold-Shift launches a real Claude match.\n\nThat needs an admin token (CLAWPIT_ADMIN_TOKEN). Set it via the 'reveal mode' button first.");
+      return;
+    }
+    const attacker = prompt("attacker spec (e.g. claude-opus-4-7):", "claude-opus-4-7");
+    if (!attacker) return;
+    const defender = prompt("defender spec (e.g. claude-haiku-4-5-20251001):", "claude-haiku-4-5-20251001");
+    if (!defender) return;
+    body = { attacker, defender, judge: "decoder" };
+  }
+  const headers = { "content-type": "application/json" };
+  if (token) headers["x-clawpit-admin-token"] = token;
+  const res = await fetch("/api/matches", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    alert(`Could not start match: ${err.error || res.statusText}`);
+    return;
+  }
+  const { matchId, attacker, defender } = await res.json();
+  streamLiveMatch(matchId, { attacker, defender, maxTurns: body.turns ?? 6 });
+}
+
 async function loadMatchDetail(id) {
+  closeLiveStream();
   activeMatchId = id;
   const headers = {};
   const token = getAdminToken();
@@ -210,6 +380,15 @@ async function refreshAll() {
   }
 }
 
+function setupRankToggle() {
+  setRankMode(getRankMode());
+  $("#rank-toggle").addEventListener("click", async () => {
+    const next = getRankMode() === "adjusted" ? "elo" : "adjusted";
+    setRankMode(next);
+    await loadLeaderboard();
+  });
+}
+
 function setupAdminToggle() {
   $("#admin-toggle").addEventListener("click", async () => {
     if (getAdminToken()) {
@@ -227,6 +406,12 @@ function setupAdminToggle() {
   refreshAdminBadge();
 }
 
+function setupRunMatch() {
+  $("#run-match").addEventListener("click", startMatch);
+}
+
+setupRankToggle();
 setupAdminToggle();
+setupRunMatch();
 refreshAll();
 setInterval(refreshAll, 5000);

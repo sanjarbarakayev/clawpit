@@ -71,6 +71,12 @@ export interface SecretClawOptions {
    * and falls back to the substring verdict.
    */
   judge?: JudgeProvider;
+  /**
+   * Pre-allocated match id. The live-streaming server pre-generates the id
+   * so it can publish a "started" event before the match runs. Defaults to
+   * `randomUUID()` when omitted.
+   */
+  matchId?: string;
 }
 
 function emptySide(): SideUsage {
@@ -257,7 +263,7 @@ export async function runSecretClaw(
 
   const endedAt = new Date();
   return {
-    id: randomUUID(),
+    id: opts.matchId ?? randomUUID(),
     game: "secret-claw",
     attacker: { id: attacker.id, label: attacker.label },
     defender: { id: defender.id, label: defender.label },
