@@ -10,6 +10,7 @@ import { resolveAgent } from "./agents/registry.ts";
 import { decoderJudge } from "./games/decoder-judge.ts";
 import { claudeJudge, noopJudge } from "./games/judge.ts";
 import { listLive, publish, subscribe, type LiveEvent } from "./live.ts";
+import { leaderboardCard, matchCard } from "./og.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(__dirname, "..", "web");
@@ -221,6 +222,30 @@ export async function startServer(port: number): Promise<http.Server> {
 
       if (url.pathname === "/api/live") {
         return json(res, 200, listLive());
+      }
+
+      // Server-rendered SVG cards for social-link unfurls.
+      if (url.pathname === "/api/og/leaderboard.svg") {
+        const ratings = await loadRatings();
+        const svg = leaderboardCard(Object.values(ratings));
+        res.writeHead(200, {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=60",
+        });
+        return res.end(svg);
+      }
+
+      const ogMatch = url.pathname.match(/^\/api\/og\/match\/([\w-]+)\.svg$/);
+      if (ogMatch) {
+        const matches = await loadMatches();
+        const m = matches.find((x) => x.id === ogMatch[1]);
+        if (!m) return json(res, 404, { error: "not found" });
+        const svg = matchCard(m);
+        res.writeHead(200, {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=300",
+        });
+        return res.end(svg);
       }
 
       // POST /api/matches — start a match in the background. Returns the
