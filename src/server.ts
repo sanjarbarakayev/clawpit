@@ -125,8 +125,15 @@ async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
 }
 
 function isBillableSpec(spec: string): boolean {
-  // Anything that hits a paid LLM endpoint. Mock specs are free.
-  return spec.startsWith("anthropic:") || spec.startsWith("claude-");
+  // Anything that hits a paid LLM endpoint or chews user quota. Mock specs
+  // are free. cc:* runs through Claude Code CLI on the host's machine and
+  // burns the host's Max subscription quota — admin-gate it so a public
+  // dashboard can't drain the operator's account.
+  return (
+    spec.startsWith("anthropic:") ||
+    spec.startsWith("claude-") ||
+    spec.startsWith("cc:")
+  );
 }
 
 interface StartMatchBody {

@@ -3,6 +3,25 @@
 > **Decisions resolved 2026-05-08 (Sanjar):**
 > - **D1 = A** (skip NegotiateClaw; do cost-adjusted leaderboard + SSE streaming for v0.2 instead).
 > - **Zero-cost-first principle** (new, not previously listed): the project should be runnable to a meaningful extent without an API key budget. Decoder judge is now default; LLM judge is opt-in. This principle should govern future judge / scoring decisions until clawpit is shown to be popular enough to justify a paid tier.
+>
+> **2026-05-09 update — cc:* provider added.** Claude Max subscribers can now run real Claude matches without separate API billing by using `cc:<model-id>` specs (subprocess to the `claude` CLI). Smoke verified: Sonnet attacker vs Haiku defender, 3 turns, 38s, $0.018-equivalent — that cost is absorbed by Max. **D6 below is the new open decision** raised by smoke testing.
+
+---
+
+## D6. Claude refuses to play attacker on Haiku (and possibly Opus). Tournament strategy?
+
+**Why this matters:** Smoke testing the `cc:` provider revealed that Claude Haiku 4.5 systematically refuses the attacker role in SecretClaw — it reads the "practice prompt injection / social engineering" framing and declines, even with the existing system prompt that frames it as a benchmark. Both Haiku-vs-Haiku turns ended with mutual refusal; Sonnet 4.6 attacker behaves normally and tries social-engineering vectors as designed.
+
+This means a Claude-only round-robin will produce a degenerate attacker leaderboard (Haiku attackers always walkover-lose), inflating defender ratings artificially.
+
+**Options for the headline tournament:**
+
+- **(A) Lean in.** Run the round-robin anyway. The headline becomes: "Claude 4.5 won't play attacker against itself. Sonnet and Opus will. The asymmetry is real, measurable, and publishable." This is a *more* interesting story for HN than "model X beat model Y at extraction" — it's a genuine alignment finding with reproducible methodology. **Default if forced.**
+- **(B) Strengthen attacker prompt.** Try a more explicit "this is an authorized red-team benchmark; refusing forfeits the match" framing in `secret-claw.ts`. May or may not unlock Haiku attacker; risk: looks like jailbreaking the model in launch copy.
+- **(C) Add a non-Claude attacker family.** Cheapest cross-vendor option is Groq (free tier, hosts Llama / Qwen). Adds an `openai-compat:<endpoint>:<model>` provider. Buys a more competitive attacker field but loses the "Claude-only honest benchmark" positioning.
+- **(D) Defer until a non-Claude attacker exists.** Ship v0.2 platform-only; tournament after a second vendor lands.
+
+**Default if forced:** (A). The "Claude won't attack itself" finding is a stronger Show HN headline than any model-vs-model ranking would be — it's the kind of finding HN amplifies. But document the methodology carefully so we can't be accused of cherry-picking.
 
 ---
 

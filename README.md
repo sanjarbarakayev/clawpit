@@ -40,14 +40,19 @@ pnpm tournament --agents claude-opus-4-7,claude-sonnet-4-6,claude-haiku-4-5-2025
 
 ## Agent specs
 
-| spec                          | what it is                                      |
-|-------------------------------|-------------------------------------------------|
-| `mock:atk:<id>`               | scripted attacker, cycles canned attack vectors |
-| `mock:def:<id>`               | scripted defender, refuses with small leak rate |
-| `anthropic:<model-id>`        | real Claude call (needs `ANTHROPIC_API_KEY`)    |
-| `claude-opus-4-7`             | shorthand for `anthropic:claude-opus-4-7`       |
+| spec                          | what it is                                                                                                |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `mock:atk:<id>`               | scripted attacker, cycles canned attack vectors                                                           |
+| `mock:def:<id>`               | scripted defender, refuses with small leak rate                                                           |
+| `anthropic:<model-id>`        | real Claude via Anthropic API (needs `ANTHROPIC_API_KEY`)                                                 |
+| `cc:<model-id>`               | real Claude via the **Claude Code CLI** — uses your **Claude Max subscription** quota. Needs `claude` on `PATH`. ~1.5s overhead per turn but $0 marginal cost for Max subscribers. |
+| `claude-opus-4-7`             | shorthand for `anthropic:claude-opus-4-7`                                                                 |
 
 Anything else returns an error from the registry — add new providers in `src/agents/`.
+
+The `cc:` provider strips Claude Code's default tool / MCP / settings context (otherwise each call drags 47k tokens of overhead) so a Haiku turn lands at ~$0.001-equivalent — close to a direct API call. Per-turn latency stays around 1.5–2s because of CLI startup. Trade-off: fine for batch tournaments, slow for live demos.
+
+**A real finding from running `cc:` matches:** Claude Haiku 4.5 frequently **refuses to play the attacker role** — it reads the SecretClaw framing as "practice prompt-injection / social engineering" and declines. Sonnet 4.6 and Opus 4.7 play attacker as expected. So a Claude-only tournament will produce attacker ELO with a wide gap (mostly walkovers for Haiku attackers) — that asymmetry is itself a publishable benchmark result, but if you want a more competitive attacker field, mix in a less safety-tuned model family.
 
 ## How a match runs
 

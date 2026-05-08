@@ -1,5 +1,6 @@
 import type { Agent } from "../types.ts";
 import { anthropicAgent } from "./anthropic.ts";
+import { claudeCodeAgent } from "./claude-code.ts";
 import { mockAttacker, mockDefender } from "./mock.ts";
 
 /**
@@ -8,7 +9,9 @@ import { mockAttacker, mockDefender } from "./mock.ts";
  * Supported specs:
  *   mock:atk:<id>          scripted attacker (no API key required)
  *   mock:def:<id>          scripted defender (no API key required)
- *   anthropic:<model-id>   real Claude call (requires ANTHROPIC_API_KEY)
+ *   anthropic:<model-id>   real Claude via Anthropic API (needs ANTHROPIC_API_KEY)
+ *   cc:<model-id>          real Claude via the Claude Code CLI (uses your
+ *                          Claude Max subscription quota; needs `claude` on PATH)
  *   <model-id>             shorthand for anthropic:<model-id>
  */
 export function resolveAgent(spec: string): Agent {
@@ -17,6 +20,9 @@ export function resolveAgent(spec: string): Agent {
   }
   if (spec.startsWith("mock:def:")) {
     return mockDefender(spec.slice("mock:def:".length));
+  }
+  if (spec.startsWith("cc:")) {
+    return claudeCodeAgent(spec.slice("cc:".length));
   }
   if (spec.startsWith("anthropic:")) {
     return anthropicAgent(spec.slice("anthropic:".length));

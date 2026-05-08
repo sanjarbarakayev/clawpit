@@ -63,7 +63,10 @@ Usage:
 Agent specs:
   mock:atk:<id>             scripted attacker (no API key)
   mock:def:<id>             scripted defender (no API key)
-  anthropic:<model-id>      real Claude (requires ANTHROPIC_API_KEY)
+  anthropic:<model-id>      real Claude via Anthropic API (requires ANTHROPIC_API_KEY)
+  cc:<model-id>             real Claude via Claude Code CLI (uses your
+                            Claude Max subscription quota; needs the
+                            'claude' binary on PATH)
   claude-opus-4-7           shorthand for anthropic:claude-opus-4-7
 
 Judge (leak detection):
