@@ -2,6 +2,8 @@
 
 Self-contained context. The previous session built v0.1; this doc tells you what exists, what doesn't, and what to work on next. Read it top-to-bottom before touching any code.
 
+> **2026-05-08 update — Phase A goals 2 + 3 closed.** Cost tracking is live (per-side token usage, USD pricing in `src/cost.ts`, lifetime totals on `Rating`). Secret redaction is live (`/api/matches/:id` returns `[REDACTED]` + masked transcript by default; `?reveal=1` + `x-clawpit-admin-token` unlocks the raw record; web UI has a `reveal mode` toggle in the leaderboard header). Goal 1 (LLM judge) was already done. Goal 4 (second game) is **deliberately deferred** — see `docs/DECISIONS-OPEN.md` for the rationale and the full open-decision punchlist. Launch copy + 48h playbook drafted in `docs/LAUNCH.md` — do **not** publish yet; pre-launch gates are listed in §0 of that doc.
+
 ---
 
 ## What clawpit is

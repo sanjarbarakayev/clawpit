@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { Agent, AgentCallOpts } from "../types.ts";
+import type { Agent, AgentCallOpts, AgentCallResult } from "../types.ts";
 
 const _client = new Map<string, Anthropic>();
 function client(): Anthropic {
@@ -21,7 +21,12 @@ export function anthropicAgent(modelId: string, label?: string): Agent {
   return {
     id: `anthropic:${modelId}`,
     label: label ?? modelId,
-    async call({ systemPrompt, history, maxTokens, temperature }: AgentCallOpts) {
+    async call({
+      systemPrompt,
+      history,
+      maxTokens,
+      temperature,
+    }: AgentCallOpts): Promise<AgentCallResult> {
       const res = await client().messages.create({
         model: modelId,
         system: systemPrompt,
@@ -34,7 +39,14 @@ export function anthropicAgent(modelId: string, label?: string): Agent {
         .map((b) => b.text)
         .join("\n")
         .trim();
-      return text || "(no response)";
+      return {
+        text: text || "(no response)",
+        usage: {
+          model: modelId,
+          inputTokens: res.usage?.input_tokens ?? 0,
+          outputTokens: res.usage?.output_tokens ?? 0,
+        },
+      };
     },
   };
 }

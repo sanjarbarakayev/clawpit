@@ -53,10 +53,16 @@ function ensureRating(
       asAttackerLosses: 0,
       asDefenderWins: 0,
       asDefenderLosses: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCostUsd: 0,
     };
   } else {
-    // keep label fresh
     ratings[agentId].label = label;
+    // Backfill cost fields for ratings written before cost tracking landed.
+    ratings[agentId].totalInputTokens ??= 0;
+    ratings[agentId].totalOutputTokens ??= 0;
+    ratings[agentId].totalCostUsd ??= 0;
   }
   return ratings[agentId];
 }
@@ -95,6 +101,15 @@ export async function recordMatch(match: MatchResult): Promise<{
     att.losses += 1;
     att.asAttackerLosses += 1;
   }
+
+  // Cost / token attribution: each side gets their own; the judge bill is
+  // not assigned to either agent (it's a platform expense).
+  att.totalInputTokens += match.usage.attacker.inputTokens;
+  att.totalOutputTokens += match.usage.attacker.outputTokens;
+  att.totalCostUsd += match.usage.attacker.costUsd;
+  def.totalInputTokens += match.usage.defender.inputTokens;
+  def.totalOutputTokens += match.usage.defender.outputTokens;
+  def.totalCostUsd += match.usage.defender.costUsd;
 
   await writeJson(RATINGS_FILE, ratings);
   return { attackerRating: att, defenderRating: def };

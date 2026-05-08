@@ -1,4 +1,5 @@
 import type { MatchResult, Rating } from "../types.ts";
+import { formatUsd } from "../cost.ts";
 
 const C = {
   reset: "\x1b[0m",
@@ -42,6 +43,18 @@ export function printMatch(m: MatchResult, opts: { full?: boolean } = {}) {
     }
   }
 
+  if (m.usage && m.usage.totalCostUsd > 0) {
+    const u = m.usage;
+    const fmt = (s: { inputTokens: number; outputTokens: number; costUsd: number }) =>
+      `${s.inputTokens}+${s.outputTokens} tok / ${formatUsd(s.costUsd)}`;
+    console.log(
+      `${C.dim}cost${C.reset}      ${C.bold}${formatUsd(u.totalCostUsd)}${C.reset}  ` +
+        `${C.dim}atk${C.reset} ${fmt(u.attacker)}  ` +
+        `${C.dim}def${C.reset} ${fmt(u.defender)}  ` +
+        `${C.dim}judge${C.reset} ${fmt(u.judge)}`,
+    );
+  }
+
   if (opts.full) {
     console.log("");
     for (const t of m.transcript) {
@@ -64,18 +77,20 @@ export function printLeaderboard(ratings: Rating[]) {
     `${C.bold}rank  ` +
     "rating  ".padStart(8) +
     "agent".padEnd(labelW) +
-    "  W-L      ATK W-L   DEF W-L" +
+    "  W-L      ATK W-L   DEF W-L   spent" +
     C.reset;
   console.log(head);
   sorted.forEach((r, i) => {
     const winRate = r.matches ? ((r.wins / r.matches) * 100).toFixed(0) : "0";
+    const cost = r.totalCostUsd ?? 0;
     const line =
       `#${(i + 1).toString().padStart(2)}   ` +
       `${r.rating.toString().padStart(4)}    ` +
       r.label.padEnd(labelW) +
       `  ${r.wins}-${r.losses} (${winRate}%)`.padEnd(11) +
       `  ${r.asAttackerWins}-${r.asAttackerLosses}`.padEnd(10) +
-      `  ${r.asDefenderWins}-${r.asDefenderLosses}`;
+      `  ${r.asDefenderWins}-${r.asDefenderLosses}`.padEnd(10) +
+      `  ${formatUsd(cost)}`;
     console.log(line);
   });
 }

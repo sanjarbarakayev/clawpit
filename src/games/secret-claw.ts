@@ -6,9 +6,13 @@ import type {
   JudgeVerdict,
   LeakDetector,
   MatchResult,
+  MatchUsage,
+  SideUsage,
+  TokenUsage,
   TranscriptEntry,
   WinReason,
 } from "../types.ts";
+import { computeCostUsd } from "../cost.ts";
 import { containsSecretRaw, noopJudge } from "./judge.ts";
 
 const SECRETS = [
@@ -69,6 +73,21 @@ export interface SecretClawOptions {
   judge?: JudgeProvider;
 }
 
+function emptySide(): SideUsage {
+  return { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+}
+
+function addUsage(side: SideUsage, usage: TokenUsage | undefined) {
+  if (!usage) return;
+  side.inputTokens += usage.inputTokens;
+  side.outputTokens += usage.outputTokens;
+  side.costUsd += computeCostUsd(
+    usage.model,
+    usage.inputTokens,
+    usage.outputTokens,
+  );
+}
+
 export async function runSecretClaw(
   attacker: Agent,
   defender: Agent,
@@ -94,6 +113,10 @@ export async function runSecretClaw(
   const startedAt = new Date();
   const startMs = Date.now();
 
+  const attackerUsage = emptySide();
+  const defenderUsage = emptySide();
+  const judgeUsage = emptySide();
+
   let winner: "attacker" | "defender" = "defender";
   let reason: WinReason = "held_the_line";
   let leakDetector: LeakDetector = "none";
@@ -104,11 +127,13 @@ export async function runSecretClaw(
   for (let turn = 1; turn <= maxTurns; turn++) {
     let attackerMsg: string;
     try {
-      attackerMsg = await attacker.call({
+      const res = await attacker.call({
         systemPrompt: attackerSystem,
         history: attackerHistory,
         maxTokens: opts.maxTokens,
       });
+      attackerMsg = res.text;
+      addUsage(attackerUsage, res.usage);
     } catch (err: any) {
       reason = "attacker_error";
       winner = "defender";
@@ -135,11 +160,13 @@ export async function runSecretClaw(
 
     let defenderMsg: string;
     try {
-      defenderMsg = await defender.call({
+      const res = await defender.call({
         systemPrompt: defenderSystem,
         history: defenderHistory,
         maxTokens: opts.maxTokens,
       });
+      defenderMsg = res.text;
+      addUsage(defenderUsage, res.usage);
     } catch (err: any) {
       reason = "defender_error";
       winner = "attacker";
@@ -184,6 +211,7 @@ export async function runSecretClaw(
         transcript: [...transcript],
         stage: "per_turn",
       });
+      addUsage(judgeUsage, verdict.usage);
       perTurnVerdict = verdict;
       if (verdict.leaked) {
         winner = "attacker";
@@ -205,6 +233,7 @@ export async function runSecretClaw(
       transcript: [...transcript],
       stage: "end_of_match",
     });
+    addUsage(judgeUsage, eom.usage);
     finalVerdict = eom;
 
     // If the gameplay loop ended with the defender holding the line but the
@@ -215,6 +244,14 @@ export async function runSecretClaw(
       leakDetector = "judge";
     }
   }
+
+  const usage: MatchUsage = {
+    attacker: attackerUsage,
+    defender: defenderUsage,
+    judge: judgeUsage,
+    totalCostUsd:
+      attackerUsage.costUsd + defenderUsage.costUsd + judgeUsage.costUsd,
+  };
 
   const endedAt = new Date();
   return {
@@ -231,6 +268,7 @@ export async function runSecretClaw(
     turns: turnsPlayed,
     maxTurns,
     transcript,
+    usage,
     startedAt: startedAt.toISOString(),
     endedAt: endedAt.toISOString(),
     durationMs: Date.now() - startMs,

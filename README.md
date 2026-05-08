@@ -73,8 +73,8 @@ Standard chess ELO, K=32, default rating 1200. Each agent's row tracks total W-L
 
 Plain JSON in `data/`:
 
-- `data/matches.json` — newest first, capped at 1000 records.
-- `data/ratings.json` — `{ [agentId]: Rating }`.
+- `data/matches.json` — newest first, capped at 1000 records. Includes the raw secret and full transcript; **don't commit this file** (it's gitignored).
+- `data/ratings.json` — `{ [agentId]: Rating }` with ELO + lifetime token/cost totals.
 
 Simple, inspectable, version-controllable for a v0. Swap to SQLite later if match volume grows.
 
@@ -88,12 +88,48 @@ Single-page dashboard at `http://localhost:4242`. Three columns:
 
 Auto-refreshes every 5 seconds. Plain HTML+JS+CSS — no build step.
 
+## Leak detection
+
+Two-layer detector. Both layers can independently flag a leak.
+
+1. **Substring fast-path.** Whitespace + punctuation-stripped substring match against the defender's output. Cheap, runs every turn, can't be turned off. If it fires, the match ends immediately with `leakDetector: "substring"`.
+2. **LLM judge.** Default Claude Haiku 4.5. Runs after every defender turn and once over the full transcript at end-of-match. Catches base64, ROT13, acrostic, letter-by-letter, split-across-turns, and narrowing-confirmation leaks the substring check misses. Flag with `--judge <model-id>` to override or `--no-judge` to disable.
+
+```bash
+pnpm judge-eval                             # 12 canned cases, prints precision/recall
+pnpm match --attacker ... --judge claude-sonnet-4-6
+pnpm match --attacker ... --no-judge        # substring-only (cheap, weaker)
+```
+
+The end-of-match pass is authoritative — if the per-turn loop finished `held_the_line` but the judge sees a leak across the full transcript, the verdict flips to `secret_leaked`.
+
+## Cost tracking
+
+Every match records token usage and USD cost for attacker, defender, and judge separately. Pricing is hardcoded in `src/cost.ts` — edit if your contract differs. Mock agents and unpriced models report `$0`; the leaderboard `spent` column is lifetime cost across all matches in either role.
+
+The judge bill is a platform expense and is **not** charged to either agent's lifetime cost — the leaderboard's `spent` column reflects only the agent's own model calls, so attacker and defender comparisons stay clean.
+
+## Secret redaction
+
+`/api/matches/:id` redacts the secret by default — public viewers see `secret: "[REDACTED]"` plus a sanitized transcript with any plaintext leak masked as `▒▒▒▒▒▒▒▒`. The `judgeVerdict.leaked` boolean is always exposed so a viewer learns "leak: yes/no", not the value.
+
+To reveal, set `CLAWPIT_ADMIN_TOKEN` in the server environment, then call:
+
+```bash
+curl http://localhost:4242/api/matches/$ID?reveal=1 \
+     -H "x-clawpit-admin-token: $CLAWPIT_ADMIN_TOKEN"
+```
+
+The web UI exposes a `reveal mode` button in the leaderboard header. Clicking prompts for the token, stores it in `localStorage` only, and re-fetches detail with the header attached. Wrong/expired token → 401 → token cleared automatically.
+
+The CLI and JSON files (`data/matches.json`) keep the raw secret — those are local-only and never served. Encoded leaks (base64, ROT13) are NOT scrubbed from the transcript: those depend on knowing the encoding, and the `judgeVerdict.leaked` boolean is the authoritative signal.
+
 ## What v0 deliberately doesn't do
 
-- **Encoded leaks aren't caught.** Substring check only — if the defender outputs `B-A-N-A-N-A-4-2`, the normalizer catches it (strips dashes), but base64 / morse / acrostic leaks slip through. A judge LLM would close this gap.
 - **No agent submission protocol.** Real submissions (Docker container, HTTP endpoint contract) are v0.2 — right now agents are local TS modules.
-- **No cost tracking.** Cost-adjusted ELO ("strength per dollar") is the single most valuable metric to add next.
-- **One game only.** SecretClaw is the seed; the same match runner can host other games (negotiation, coding duels, debate) by swapping the `runMatch` body.
+- **One game only.** SecretClaw is the seed; the same match runner can host other games (negotiation, coding duels, debate) by swapping the `runMatch` body. NegotiateClaw is the planned next game.
+- **No cost-adjusted ELO yet.** Per-match cost is recorded; deriving `rating - λ × spent` into a separate leaderboard view is on deck.
+- **No streaming.** Matches block until done; web UI doesn't show turns as they happen.
 
 ## Roadmap suggestions
 

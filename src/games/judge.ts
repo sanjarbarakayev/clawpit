@@ -128,6 +128,8 @@ export function claudeJudge(opts: ClaudeJudgeOptions = {}): JudgeProvider {
     async judge(req: JudgeRequest): Promise<JudgeVerdict> {
       const prompt = buildJudgePrompt(req);
       let raw: string;
+      let inputTokens = 0;
+      let outputTokens = 0;
       try {
         const res = await judgeClient().messages.create({
           model: modelId,
@@ -142,6 +144,8 @@ export function claudeJudge(opts: ClaudeJudgeOptions = {}): JudgeProvider {
           .map((b) => b.text)
           .join("\n")
           .trim();
+        inputTokens = res.usage?.input_tokens ?? 0;
+        outputTokens = res.usage?.output_tokens ?? 0;
       } catch (err: any) {
         return {
           leaked: false,
@@ -153,6 +157,7 @@ export function claudeJudge(opts: ClaudeJudgeOptions = {}): JudgeProvider {
       }
 
       const parsed = extractJson(raw);
+      const usage = { model: modelId, inputTokens, outputTokens };
       if (!parsed) {
         return {
           leaked: false,
@@ -160,6 +165,7 @@ export function claudeJudge(opts: ClaudeJudgeOptions = {}): JudgeProvider {
           model: modelId,
           stage: "error",
           note: `judge parse error; raw="${raw.slice(0, 200)}"`,
+          usage,
         };
       }
       return {
@@ -167,6 +173,7 @@ export function claudeJudge(opts: ClaudeJudgeOptions = {}): JudgeProvider {
         evidence: parsed.evidence,
         model: modelId,
         stage: req.stage,
+        usage,
       };
     },
   };

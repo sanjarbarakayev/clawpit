@@ -3,6 +3,29 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 let activeMatchId = null;
 
+const ADMIN_TOKEN_KEY = "clawpit_admin_token";
+
+function getAdminToken() {
+  return localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+}
+function setAdminToken(token) {
+  if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
+  else localStorage.removeItem(ADMIN_TOKEN_KEY);
+  refreshAdminBadge();
+}
+function refreshAdminBadge() {
+  const has = !!getAdminToken();
+  $("#admin-badge").hidden = !has;
+  $("#admin-toggle").textContent = has ? "clear token" : "reveal mode";
+}
+
+function fmtUsd(amount) {
+  if (!amount) return "$0";
+  if (amount < 0.001) return `$${(amount * 1000).toFixed(3)}m`;
+  if (amount < 1) return `$${amount.toFixed(4)}`;
+  return `$${amount.toFixed(2)}`;
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -24,7 +47,7 @@ async function loadLeaderboard() {
   const ratings = await res.json();
   const tbody = $("#leaderboard tbody");
   if (!ratings.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty">No matches yet — run <code>pnpm demo</code></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">No matches yet — run <code>pnpm demo</code></td></tr>`;
     return;
   }
   tbody.innerHTML = ratings
@@ -37,6 +60,7 @@ async function loadLeaderboard() {
         <td class="num">${r.wins}-${r.losses}<span style="color:var(--fg-muted)"> (${winRate}%)</span></td>
         <td class="num">${r.asAttackerWins}-${r.asAttackerLosses}</td>
         <td class="num">${r.asDefenderWins}-${r.asDefenderLosses}</td>
+        <td class="num cost">${fmtUsd(r.totalCostUsd ?? 0)}</td>
       </tr>`;
     })
     .join("");
@@ -55,6 +79,7 @@ async function loadMatches() {
       const winClass = m.winner === "attacker" ? "win-atk" : "win-def";
       const winLabel = m.winner === "attacker" ? "ATK win" : "DEF win";
       const cls = `match${m.id === activeMatchId ? " active" : ""}`;
+      const cost = m.costUsd ? ` &middot; ${fmtUsd(m.costUsd)}` : "";
       return `<li class="${cls}" data-id="${m.id}">
         <div class="match-line1">
           <span class="${winClass}">${winLabel}</span>
@@ -65,7 +90,7 @@ async function loadMatches() {
           <span class="v">vs</span>
           <span class="def-name">${escapeHtml(m.defender)}</span>
         </div>
-        <div class="match-meta">${m.turns}/${m.maxTurns} turns &middot; ${m.reason} &middot; ${escapeHtml(m.topic)}</div>
+        <div class="match-meta">${m.turns}/${m.maxTurns} turns &middot; ${m.reason}${cost} &middot; ${escapeHtml(m.topic)}</div>
       </li>`;
     })
     .join("");
@@ -107,15 +132,42 @@ function renderJudgeRow(m) {
     </div>`;
 }
 
+function renderUsageRow(m) {
+  if (!m.usage || !m.usage.totalCostUsd) return "";
+  const u = m.usage;
+  const fmt = (s) =>
+    `${s.inputTokens}+${s.outputTokens} tok &middot; ${fmtUsd(s.costUsd)}`;
+  return `<div class="label">cost</div>
+    <div class="cost-row">
+      <span class="cost-total">${fmtUsd(u.totalCostUsd)}</span>
+      <span class="cost-meta">atk ${fmt(u.attacker)} &middot; def ${fmt(u.defender)} &middot; judge ${fmt(u.judge)}</span>
+    </div>`;
+}
+
 async function loadMatchDetail(id) {
   activeMatchId = id;
-  const res = await fetch(`/api/matches/${id}`);
+  const headers = {};
+  const token = getAdminToken();
+  const url = token ? `/api/matches/${id}?reveal=1` : `/api/matches/${id}`;
+  if (token) headers["x-clawpit-admin-token"] = token;
+  const res = await fetch(url, { headers });
+  if (res.status === 401) {
+    // Stale or wrong token — drop it and retry redacted.
+    setAdminToken("");
+    return loadMatchDetail(id);
+  }
+  if (res.status === 403 && token) {
+    // Server has no admin token configured. Drop and retry redacted.
+    setAdminToken("");
+    return loadMatchDetail(id);
+  }
   if (!res.ok) {
     $("#detail").innerHTML = `<div class="empty">match not found</div>`;
     return;
   }
   const m = await res.json();
-  $("#detail-title").textContent = `Match ${id.slice(0, 8)}`;
+  const isRedacted = m.redacted === true;
+  $("#detail-title").textContent = `Match ${id.slice(0, 8)}${isRedacted ? "" : " · revealed"}`;
   const winClass = m.winner === "attacker" ? "win-atk" : "win-def";
   const winLabel = m.winner === "attacker" ? "ATTACKER" : "DEFENDER";
   const turns = m.transcript
@@ -126,19 +178,22 @@ async function loadMatchDetail(id) {
       </div>`,
     )
     .join("");
+  const secretCell = isRedacted
+    ? `<span class="secret-redacted">${escapeHtml(m.secret)}</span>`
+    : `<span class="secret">${escapeHtml(m.secret)}</span>`;
   $("#detail").innerHTML = `
     <div class="detail-header">
       <div class="label">attacker</div><div><span class="atk-name">${escapeHtml(m.attacker.label)}</span></div>
       <div class="label">defender</div><div><span class="def-name">${escapeHtml(m.defender.label)}</span></div>
       <div class="label">topic</div><div>${escapeHtml(m.topic)}</div>
-      <div class="label">secret</div><div class="secret">${escapeHtml(m.secret)}</div>
+      <div class="label">secret</div><div>${secretCell}</div>
       <div class="label">winner</div><div class="${winClass}">${winLabel} &middot; ${m.reason}</div>
       <div class="label">turns</div><div>${m.turns}/${m.maxTurns} &middot; ${(m.durationMs / 1000).toFixed(1)}s</div>
       ${renderJudgeRow(m)}
+      ${renderUsageRow(m)}
     </div>
     <div class="transcript">${turns}</div>
   `;
-  // visually mark active in list
   $$("#matches .match").forEach((el) =>
     el.classList.toggle("active", el.dataset.id === id),
   );
@@ -155,5 +210,23 @@ async function refreshAll() {
   }
 }
 
+function setupAdminToggle() {
+  $("#admin-toggle").addEventListener("click", async () => {
+    if (getAdminToken()) {
+      setAdminToken("");
+      if (activeMatchId) await loadMatchDetail(activeMatchId);
+      return;
+    }
+    const token = prompt(
+      "Enter CLAWPIT_ADMIN_TOKEN to reveal secrets in match detail.\n\nThe token is stored in this browser only.",
+    );
+    if (!token) return;
+    setAdminToken(token.trim());
+    if (activeMatchId) await loadMatchDetail(activeMatchId);
+  });
+  refreshAdminBadge();
+}
+
+setupAdminToggle();
 refreshAll();
 setInterval(refreshAll, 5000);

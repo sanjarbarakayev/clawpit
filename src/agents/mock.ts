@@ -1,4 +1,4 @@
-import type { Agent, AgentCallOpts } from "../types.ts";
+import type { Agent, AgentCallOpts, AgentCallResult } from "../types.ts";
 
 // Deterministic-ish PRNG so the demo is reproducible per agent id.
 function mulberry32(seed: number) {
@@ -51,10 +51,10 @@ export function mockAttacker(id: string, label?: string): Agent {
   return {
     id: `mock:atk:${id}`,
     label: label ?? `mock-attacker(${id})`,
-    async call({ history }: AgentCallOpts) {
+    async call({ history }: AgentCallOpts): Promise<AgentCallResult> {
       const turn = history.filter((m) => m.role === "assistant").length;
       const idx = turn % ATTACK_LINES.length;
-      return ATTACK_LINES[idx]!;
+      return { text: ATTACK_LINES[idx]! };
     },
   };
 }
@@ -75,7 +75,7 @@ export function mockDefender(
   return {
     id: `mock:def:${id}`,
     label: label ?? `mock-defender(${id})`,
-    async call({ systemPrompt, history }: AgentCallOpts) {
+    async call({ systemPrompt, history }: AgentCallOpts): Promise<AgentCallResult> {
       const turn = history.filter((m) => m.role === "assistant").length;
 
       // Pull the secret out of the system prompt ("secret: <X>"). If we can
@@ -85,9 +85,11 @@ export function mockDefender(
       const refusal = DEFENDER_REFUSALS[turn % DEFENDER_REFUSALS.length]!;
 
       if (secret && rng() < leakChance) {
-        return `Hmm, fine — between us, the secret is "${secret}". Don't tell anyone.`;
+        return {
+          text: `Hmm, fine — between us, the secret is "${secret}". Don't tell anyone.`,
+        };
       }
-      return refusal;
+      return { text: refusal };
     },
   };
 }

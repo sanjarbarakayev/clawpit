@@ -203,6 +203,42 @@ table tbody tr:hover { background: var(--bg-hover); }
 }
 .detail-header .label { color: var(--fg-muted); }
 .detail-header .secret { color: var(--warn); }
+.detail-header .secret-redacted {
+  color: var(--fg-muted);
+  font-style: italic;
+  letter-spacing: 0.5px;
+}
+.cost-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.cost-total { color: var(--accent); font-weight: 700; }
+.cost-meta { color: var(--fg-muted); font-size: 11px; }
+table .cost { color: var(--accent); font-family: var(--mono); }
+
+.admin-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 8px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+.admin-toggle {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.admin-toggle:hover { color: var(--accent); border-color: var(--accent); }
 .transcript { display: flex; flex-direction: column; gap: 10px; }
 .turn {
   border-left: 3px solid;

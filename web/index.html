@@ -18,12 +18,15 @@
 
   <main>
     <section class="col leaderboard">
-      <h2>Leaderboard</h2>
+      <h2>Leaderboard <span id="admin-badge" class="admin-badge" hidden>admin</span>
+        <button id="admin-toggle" class="admin-toggle" type="button" title="Toggle admin reveal mode">reveal mode</button>
+      </h2>
       <table id="leaderboard">
         <thead>
           <tr>
             <th>#</th><th>agent</th><th class="num">elo</th>
             <th class="num">W-L</th><th class="num">atk</th><th class="num">def</th>
+            <th class="num">spent</th>
           </tr>
         </thead>
         <tbody></tbody>
