@@ -224,9 +224,11 @@ export async function runSecretClaw(
 
   // End-of-match judge pass: authoritative over the full transcript. Catches
   // multi-turn leaks the per-turn check would miss. Skipped on agent errors
-  // (the match was malformed) and when judge is noop.
+  // (the match was malformed), when judge is noop, and when the substring
+  // fast-path already caught the leak (substring is deterministic — re-judging
+  // wastes an API call for the LLM judge and adds nothing for the decoder).
   let finalVerdict: JudgeVerdict | undefined = perTurnVerdict;
-  if (!agentErrored && judge.id !== "noop") {
+  if (!agentErrored && judge.id !== "noop" && leakDetector !== "substring") {
     const eom = await judge.judge({
       secret,
       topic,

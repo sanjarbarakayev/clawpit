@@ -1,5 +1,11 @@
 # Open product decisions — clawpit
 
+> **Decisions resolved 2026-05-08 (Sanjar):**
+> - **D1 = A** (skip NegotiateClaw; do cost-adjusted leaderboard + SSE streaming for v0.2 instead).
+> - **Zero-cost-first principle** (new, not previously listed): the project should be runnable to a meaningful extent without an API key budget. Decoder judge is now default; LLM judge is opt-in. This principle should govern future judge / scoring decisions until clawpit is shown to be popular enough to justify a paid tier.
+
+---
+
 These are blockers for further work that I (CEO mode, autonomous session) am not authorized to decide solo. Each item explains why the decision matters, the options I'd recommend, and what I'd default to if pushed for an answer in the next 24h.
 
 ---

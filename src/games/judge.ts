@@ -179,8 +179,7 @@ export function claudeJudge(opts: ClaudeJudgeOptions = {}): JudgeProvider {
   };
 }
 
-/** Pick a sensible default judge based on the environment. */
-export function defaultJudge(): JudgeProvider {
-  if (!process.env.ANTHROPIC_API_KEY) return noopJudge;
-  return claudeJudge();
-}
+// Note: the project default judge now lives in decoder-judge.ts. Keeping the
+// import surface here minimal so callers explicitly choose noop / decoder /
+// claude — `defaultJudge()` was removed because the right default depends on
+// where you're calling from (CLI flags vs. library use).

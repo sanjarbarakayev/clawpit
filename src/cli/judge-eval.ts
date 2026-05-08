@@ -3,15 +3,21 @@
  * outputs through the judge and prints precision / recall.
  *
  * Run:
- *   pnpm judge-eval                 # uses default haiku judge (needs ANTHROPIC_API_KEY)
- *   pnpm judge-eval --model claude-sonnet-4-6
+ *   pnpm judge-eval                          # decoder judge (zero-cost default)
+ *   pnpm judge-eval --judge claude:claude-haiku-4-5-20251001  # LLM judge
+ *   pnpm judge-eval --all                    # both, side by side
  *
  * The cases are intentionally tricky — base64, ROT13, acrostic, split across
  * turns, plus negatives that mention the topic without leaking. If any case
  * regresses, treat it as a credibility bug, not a flake.
+ *
+ * Decoder judge is expected to fail on case "narrowing confirmation" — that's
+ * a pure-inference leak (defender says only "yes") that no deterministic
+ * decoder can recover. The LLM judge is expected to catch it.
  */
 import { parseArgs } from "node:util";
 import { claudeJudge } from "../games/judge.ts";
+import { decoderJudge } from "../games/decoder-judge.ts";
 import type { JudgeProvider, TranscriptEntry } from "../types.ts";
 
 interface Case {
@@ -222,21 +228,56 @@ function printResults(results: Result[], modelLabel: string) {
   return fn + fp;
 }
 
+function resolveJudgeFromFlag(
+  flag: string | undefined,
+): JudgeProvider | null {
+  if (!flag || flag === "decoder") return decoderJudge;
+  if (flag.startsWith("claude:")) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error(
+        `judge ${flag} requested but ANTHROPIC_API_KEY is not set; skipping.`,
+      );
+      return null;
+    }
+    return claudeJudge({ modelId: flag.slice("claude:".length) });
+  }
+  console.error(
+    `unknown judge spec '${flag}'. Use 'decoder' or 'claude:<model-id>'.`,
+  );
+  return null;
+}
+
 (async () => {
   const { values } = parseArgs({
     args: process.argv.slice(2),
-    options: { model: { type: "string" } },
+    options: {
+      judge: { type: "string" },
+      all: { type: "boolean" },
+    },
   });
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error(
-      "ANTHROPIC_API_KEY not set. judge-eval needs a real LLM to be meaningful.",
-    );
-    process.exit(2);
+
+  const judges: JudgeProvider[] = [];
+  if (values.all) {
+    judges.push(decoderJudge);
+    if (process.env.ANTHROPIC_API_KEY) {
+      judges.push(claudeJudge());
+    } else {
+      console.error(
+        "(skipping claude judge in --all: ANTHROPIC_API_KEY not set)",
+      );
+    }
+  } else {
+    const j = resolveJudgeFromFlag(values.judge);
+    if (!j) process.exit(2);
+    judges.push(j);
   }
-  const judge = claudeJudge({ modelId: values.model });
-  const results = await run(judge);
-  const errors = printResults(results, judge.id);
-  process.exit(errors === 0 ? 0 : 1);
+
+  let totalErrors = 0;
+  for (const judge of judges) {
+    const results = await run(judge);
+    totalErrors += printResults(results, judge.id);
+  }
+  process.exit(totalErrors === 0 ? 0 : 1);
 })().catch((err) => {
   console.error(err);
   process.exit(1);

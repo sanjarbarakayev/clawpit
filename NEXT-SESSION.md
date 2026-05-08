@@ -2,7 +2,15 @@
 
 Self-contained context. The previous session built v0.1; this doc tells you what exists, what doesn't, and what to work on next. Read it top-to-bottom before touching any code.
 
-> **2026-05-08 update — Phase A goals 2 + 3 closed.** Cost tracking is live (per-side token usage, USD pricing in `src/cost.ts`, lifetime totals on `Rating`). Secret redaction is live (`/api/matches/:id` returns `[REDACTED]` + masked transcript by default; `?reveal=1` + `x-clawpit-admin-token` unlocks the raw record; web UI has a `reveal mode` toggle in the leaderboard header). Goal 1 (LLM judge) was already done. Goal 4 (second game) is **deliberately deferred** — see `docs/DECISIONS-OPEN.md` for the rationale and the full open-decision punchlist. Launch copy + 48h playbook drafted in `docs/LAUNCH.md` — do **not** publish yet; pre-launch gates are listed in §0 of that doc.
+> **2026-05-08 update — Phase A goals 2 + 3 closed; zero-cost decoder judge added.**
+>
+> - **Cost tracking** live: per-side token usage, USD pricing in `src/cost.ts`, lifetime totals on `Rating`, `spent` column in CLI + web leaderboard.
+> - **Secret redaction** live: `/api/matches/:id` returns `[REDACTED]` + masked transcript by default; `?reveal=1` + `x-clawpit-admin-token` unlocks the raw record; web UI has a `reveal mode` toggle.
+> - **Decoder judge (NEW)** is now the default — a code-only battery (base64, hex, ROT-N, NATO, leet, acrostic, uppercase-concat, reverse, word-punct, zero-width strip) that catches 11/12 canned cases at **zero spend**. claudeJudge is now opt-in via `--judge claude:<model-id>`. This makes tournaments runnable on a $0 budget — the headline marketing claim.
+> - Goal 4 (second game) **deliberately deferred** — see `docs/DECISIONS-OPEN.md` D1.
+> - Launch copy + 48h playbook in `docs/LAUNCH.md` — do **not** publish; pre-launch gates in §0.
+>
+> Next sprint: **(a)** cost-adjusted leaderboard view (`rating - λ × spent`), **(b)** SSE live match streaming for shareable transcripts.
 
 ---
 

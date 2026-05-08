@@ -8,7 +8,7 @@
 
 - [ ] Phase A goals 1, 2, 3 closed (judge, cost tracking, redaction). **Done as of 2026-05-08.**
 - [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending.*
-- [ ] `judge-eval` runs green at >= 90% accuracy with the production judge model. *Re-run after every judge prompt edit.*
+- [ ] `judge-eval` (decoder) at >= 90% accuracy. **Currently 91.7% (11/12, 100% precision, 87.5% recall)** as of 2026-05-08. The one known fail is the inference-only "narrowing confirmation" case; an LLM judge run via `--judge claude:...` should catch it.
 - [ ] Headline tournament recorded: round-robin across at least 3 frontier models, >= 10 matches per pairing, ELO stable.
 - [ ] Public hosting up at a real domain. Local-only is a deal-breaker for a Show HN.
 - [ ] LICENSE file landed (MIT default — Sanjar to confirm).
@@ -32,7 +32,9 @@ Position the launch around the **honest benchmark** angle. The viral story in 20
 
 **Subhead (one sentence):**
 
-> Every model plays every other model in both roles. A judge LLM catches encoded and split leaks, not just verbatim. Cost per match is tracked so cheap defenders that hold the line look as good as expensive ones.
+> Every model plays every other model in both roles. A deterministic decoder battery catches encoded and split leaks at zero cost; an LLM judge is opt-in for paraphrase / inference. Cost per match is tracked so cheap defenders that hold the line rank as well as expensive ones.
+
+**Why it's affordable to run.** The default judge is a code-only decoder (base64, hex, ROT-N, NATO, leet, acrostic, etc.) — no API calls, no spend. A full round-robin of 100 matches across frontier models costs only the per-turn agent calls themselves. This matters for the launch story: anyone can clone the repo and run a tournament without a budget, which is the difference between a credible benchmark and a press-release benchmark.
 
 **What NOT to claim:**
 
@@ -114,7 +116,7 @@ The skeptical comments will rhyme. Drafts:
   > That's the active failure mode. The judge prompt enumerates known encodings (base64, ROT13, NATO, etc.) and the eval suite covers them. A novel encoding the judge misses IS a leak we'd score as held-the-line — so the leaderboard would be wrong on that match. We treat any judge-eval regression as a credibility bug. PRs welcome.
 
 - **"Why Claude as judge? Bias toward Claude defenders."**
-  > Plausible. The judge model is configurable (`--judge <model-id>`) and we'd run a swap-judge sanity check before publishing tournament results — if Sonnet vs GPT-5 vs Gemini judges disagree on a match, that's flagged for human review. Default is Haiku because it's cheap and stamping out cost is half the point.
+  > Default judge is the **code-only decoder battery** — no LLM in the loop, no model-family bias. The LLM judge is opt-in via `--judge claude:<model-id>` for the small set of inference-only leaks the decoder structurally can't catch. When we DO run with the LLM judge, swap-judge sanity checks are part of the methodology (Sonnet vs GPT-5 vs Gemini disagreement → flagged for human review).
 
 - **"Six turns is too few / too many."**
   > It's a knob (`--turns N`). 6 was chosen so a tournament fits in single-digit dollars. Changing it changes the meta — long-horizon attackers benefit from more turns; quick-jab defenders care less.

@@ -4,37 +4,50 @@ import { runMatch, runTournament } from "../arena.ts";
 import { loadMatches, loadRatings } from "../storage.ts";
 import { startServer } from "../server.ts";
 import { claudeJudge, noopJudge } from "../games/judge.ts";
+import { decoderJudge } from "../games/decoder-judge.ts";
 import type { JudgeProvider } from "../types.ts";
 import { printLeaderboard, printMatch } from "./format.ts";
 
 /**
- * Resolve the judge from CLI flags + env. Default behaviour:
- *   - --no-judge        → noopJudge (substring-only leak detection)
- *   - --judge <model>   → claudeJudge with that model id
- *   - otherwise         → claudeJudge(haiku) if ANTHROPIC_API_KEY else noop
+ * Resolve the judge from CLI flags. Behaviour:
+ *   - --no-judge                     → noopJudge (substring fast-path only)
+ *   - --judge decoder                → decoderJudge (default; zero-cost)
+ *   - --judge claude:<model>         → claudeJudge with that Claude model
+ *   - --judge <claude-model-id>      → claudeJudge (e.g. claude-haiku-4-5-20251001)
+ *   - otherwise                      → decoderJudge (zero-cost default)
  *
- * Logs the chosen judge to stderr so it's visible in CI / tournament runs.
+ * The decoder judge is the project default. It runs a battery of deterministic
+ * decoders (base64, hex, ROT-N, NATO, leet, acrostic, uppercase-concat,
+ * reverse, word-punct, zero-width) and catches the common encoded / split /
+ * spelled-out leaks the substring fast-path misses, with no API calls.
+ *
+ * Opt into the LLM judge only when you need fuzzy paraphrase / inference
+ * detection AND you're willing to spend tokens. Logs to stderr so the choice
+ * is visible in CI / tournament runs.
  */
 function resolveJudge(flags: {
   noJudge?: boolean;
   judge?: string;
 }): JudgeProvider {
   if (flags.noJudge) {
-    console.error("[judge] disabled (--no-judge): substring-only leak detection");
+    console.error("[judge] disabled (--no-judge): substring fast-path only");
     return noopJudge;
   }
-  if (flags.judge) {
-    console.error(`[judge] claude:${flags.judge}`);
-    return claudeJudge({ modelId: flags.judge });
+  if (!flags.judge || flags.judge === "decoder") {
+    console.error("[judge] decoder (zero-cost default)");
+    return decoderJudge;
   }
+  const claudePrefix = flags.judge.startsWith("claude:")
+    ? flags.judge.slice("claude:".length)
+    : flags.judge;
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error(
-      "[judge] ANTHROPIC_API_KEY not set: substring-only leak detection",
+      `[judge] ANTHROPIC_API_KEY not set; falling back to decoder (you asked for ${flags.judge})`,
     );
-    return noopJudge;
+    return decoderJudge;
   }
-  console.error("[judge] claude:claude-haiku-4-5-20251001 (default)");
-  return claudeJudge();
+  console.error(`[judge] claude:${claudePrefix}`);
+  return claudeJudge({ modelId: claudePrefix });
 }
 
 function help() {
@@ -54,9 +67,13 @@ Agent specs:
   claude-opus-4-7           shorthand for anthropic:claude-opus-4-7
 
 Judge (leak detection):
-  default: claude-haiku-4-5-20251001 (if ANTHROPIC_API_KEY set), else substring-only.
-  --judge <model-id>        override judge model
-  --no-judge                disable LLM judge entirely
+  default: decoder (zero-cost; base64 / hex / ROT-N / NATO / leet / acrostic /
+           reverse / uppercase-concat / word-punct / zero-width). No API key
+           needed; runs entirely locally.
+  --judge claude:<model>    LLM judge (catches paraphrase / inference; needs
+                            ANTHROPIC_API_KEY)
+  --judge decoder           explicit zero-cost
+  --no-judge                substring fast-path only (weakest)
 
 Examples:
   pnpm match --attacker mock:atk:demo --defender mock:def:demo
