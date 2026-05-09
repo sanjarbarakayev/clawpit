@@ -155,12 +155,45 @@ async function cmdLeaderboard() {
   printLeaderboard(Object.values(ratings));
 }
 
+async function maybeSeedFromEnv() {
+  // CLAWPIT_SEED_DIR points at a directory containing matches.json and
+  // ratings.json. On first boot (empty data/), copy them in so a fresh
+  // deploy already has a leaderboard to show. Subsequent boots see
+  // populated data/ and leave it alone.
+  const seedDir = process.env.CLAWPIT_SEED_DIR;
+  if (!seedDir) return;
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const __dirname = path.dirname(new URL(import.meta.url).pathname);
+  const dataDir = path.resolve(__dirname, "..", "..", "data");
+  const matchesFile = path.join(dataDir, "matches.json");
+  try {
+    await fs.access(matchesFile);
+    // already seeded — leave alone
+    return;
+  } catch {
+    // not present, continue
+  }
+  for (const name of ["matches.json", "ratings.json"]) {
+    const src = path.join(seedDir, name);
+    const dst = path.join(dataDir, name);
+    try {
+      await fs.mkdir(dataDir, { recursive: true });
+      await fs.copyFile(src, dst);
+      console.error(`[seed] copied ${name} from ${seedDir}`);
+    } catch (err: any) {
+      console.error(`[seed] skipped ${name}: ${err?.message ?? err}`);
+    }
+  }
+}
+
 async function cmdServe() {
   const { values } = parseArgs({
     args: rest,
     options: { port: { type: "string" } },
   });
   const port = Number(values.port ?? process.env.CLAWPIT_PORT ?? 4242);
+  await maybeSeedFromEnv();
   await startServer(port);
 }
 

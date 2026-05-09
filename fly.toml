@@ -1,0 +1,57 @@
+# Fly.io deploy config — alternative to Render. Fly is the better fit if
+# you want persistent storage on the free tier (Render free is ephemeral).
+#
+# Setup:
+#   brew install flyctl
+#   fly auth signup        # one-time
+#   fly launch --copy-config --no-deploy   # adopts this fly.toml
+#   fly volumes create clawpit_data --region <closest> --size 1
+#   fly secrets set CLAWPIT_ADMIN_TOKEN=$(openssl rand -hex 32)
+#   fly deploy
+#
+# After first deploy, https://clawpit.fly.dev (or your custom domain)
+# serves the dashboard. Persistent volume keeps matches.json across redeploys.
+
+app = "clawpit"
+primary_region = "fra"   # Frankfurt — adjust to closest to expected user base
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  CLAWPIT_PORT = "8080"
+  CLAWPIT_SEED_DIR = "/app/seed"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"     # idle → stop; saves free-tier hours
+  auto_start_machines = true      # request comes in → cold-start
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+# Persistent storage for matches.json + ratings.json so tournament results
+# survive redeploys / restarts. The seed mechanism only fires when /app/data
+# is empty, so an existing volume keeps user-run matches.
+[mounts]
+  source = "clawpit_data"
+  destination = "/app/data"
+
+[[services.tcp_checks]]
+  grace_period = "20s"
+  interval = "30s"
+  restart_limit = 0
+  timeout = "5s"
+
+[deploy]
+  strategy = "rolling"

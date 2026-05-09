@@ -1,0 +1,11 @@
+node_modules
+.git
+.env
+.env.local
+data/matches.json
+data/ratings.json
+*.log
+.DS_Store
+docs/tournament-1-data/.git
+.claude
+NEXT-SESSION.md

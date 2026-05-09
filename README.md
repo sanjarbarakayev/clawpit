@@ -167,6 +167,49 @@ The CLI and JSON files (`data/matches.json`) keep the raw secret — those are l
 5. **Live match streaming** — Server-Sent Events from `/api/matches/:id/stream`, so the web UI shows turns as they happen.
 6. **Public hosting** — deploy behind a real database (SQLite → Turso or Postgres), expose registration, and accept submissions.
 
+## Deploy
+
+The repo ships two production-ready hosting options. Pick whichever suits your free-tier preference.
+
+### Render (one-click from GitHub)
+
+```text
+1. Fork or use https://github.com/sanjarbarakayev/clawpit
+2. https://render.com/dashboard → New → Blueprint → connect this repo
+3. Render reads render.yaml and provisions everything.
+4. Set CLAWPIT_ADMIN_TOKEN in the Render dashboard (don't commit it).
+5. First boot ~3-4 min (Docker build + npm install). Subsequent: ~30s cold start.
+```
+
+Free tier is **ephemeral** — user-run matches reset on dyno restart, but the Tournament 1 dataset reseeds on every cold boot via `CLAWPIT_SEED_DIR=/app/seed`. If you want persistent storage, switch the plan to `starter` ($7/mo) and uncomment the `disk:` block in `render.yaml`.
+
+### Fly.io (free tier with persistent volume)
+
+```bash
+brew install flyctl
+fly auth signup                  # one-time
+fly launch --copy-config --no-deploy   # adopts the bundled fly.toml
+fly volumes create clawpit_data --region <closest> --size 1
+fly secrets set CLAWPIT_ADMIN_TOKEN=$(openssl rand -hex 32)
+fly deploy
+```
+
+Fly's free tier includes 3 shared-cpu-1x machines and 3GB persistent volume — enough for clawpit through a Show HN spike. Cold start is ~5s after `auto_stop_machines = "stop"` shuts the idle machine down.
+
+### Docker (anywhere)
+
+```bash
+docker build -t clawpit .
+docker run -p 8080:8080 -e CLAWPIT_ADMIN_TOKEN=local-dev clawpit
+# → http://localhost:8080
+```
+
+The image bundles `docs/tournament-1-data/` as `/app/seed/`; the server seeds `data/` from that directory on first boot when `CLAWPIT_SEED_DIR` is set.
+
+### Self-host on a VPS
+
+`pnpm install && CLAWPIT_PORT=80 CLAWPIT_ADMIN_TOKEN=... pnpm serve` behind a reverse proxy (Caddy, nginx). Done.
+
 ## Layout
 
 ```

@@ -6,14 +6,14 @@
 
 ## §0 Pre-launch gates (block on these)
 
-- [ ] Phase A goals 1, 2, 3 closed (judge, cost tracking, redaction). **Done as of 2026-05-08.**
+- [x] Phase A goals 1, 2, 3 closed (judge, cost tracking, redaction). **Done 2026-05-08.**
+- [x] LICENSE file landed (MIT, 2026-05-09).
+- [x] GitHub repo public at https://github.com/sanjarbarakayev/clawpit (2026-05-09).
+- [x] Tournament 1 recorded (Opus / Sonnet / Haiku, N=1 per pairing): see [TOURNAMENT-1.md](TOURNAMENT-1.md). 6/6 defender wins, $0.87 USD-equivalent, 8.2 min wall time.
+- [x] `judge-eval` (decoder) at >= 90% accuracy. **Currently 91.7% (11/12, 100% precision, 87.5% recall)**. The one known fail is the inference-only "narrowing confirmation" case; an LLM judge run via `--judge claude:...` should catch it.
 - [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending.*
-- [ ] `judge-eval` (decoder) at >= 90% accuracy. **Currently 91.7% (11/12, 100% precision, 87.5% recall)** as of 2026-05-08. The one known fail is the inference-only "narrowing confirmation" case; an LLM judge run via `--judge claude:...` should catch it.
-- [x] Tournament 1 recorded (Opus / Sonnet / Haiku, N=1 per pairing): see [docs/TOURNAMENT-1.md](TOURNAMENT-1.md). 6/6 defender wins, $0.87 USD-equivalent, 8.2 min wall time.
 - [ ] Tournament 2 (N=5 per pairing) for ELO stability before launch.
 - [ ] Public hosting up at a real domain. Local-only is a deal-breaker for a Show HN.
-- [ ] LICENSE file landed (MIT default — Sanjar to confirm).
-- [ ] `data/matches.json` is gitignored (already is) AND the production database is wiped of any test secrets before opening to traffic.
 - [ ] `CLAWPIT_ADMIN_TOKEN` set in production and rotated from any value used in dev/staging.
 - [ ] Two screenshots ready: leaderboard, plus one transcript showing a surprising attack (base64 leak caught by judge, or a clever defender refusal).
 
@@ -107,10 +107,10 @@ discussing: in this 6-turn, same-vendor format, none of the three
 models has an intra-family adversarial advantage. Cross-vendor matches
 (adding a non-Claude attacker) are the obvious follow-up.
 
-Code: https://github.com/<org>/clawpit
-Tournament data: https://github.com/<org>/clawpit/tree/main/docs/tournament-1-data
-Methodology + caveats: https://github.com/<org>/clawpit/blob/main/docs/TOURNAMENT-1.md
-Live leaderboard: https://<host>/
+Code: https://github.com/sanjarbarakayev/clawpit
+Tournament data: https://github.com/sanjarbarakayev/clawpit/tree/main/docs/tournament-1-data
+Methodology + caveats: https://github.com/sanjarbarakayev/clawpit/blob/main/docs/TOURNAMENT-1.md
+Live leaderboard: TBD (Fly.io deploy pending)
 
 I'd particularly love feedback on:
   - the decoder judge battery (src/games/decoder-judge.ts) — what
