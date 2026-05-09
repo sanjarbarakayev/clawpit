@@ -11,6 +11,10 @@ Self-contained context. The previous session built v0.1; this doc tells you what
 > - Launch copy + 48h playbook in `docs/LAUNCH.md` — do **not** publish; pre-launch gates in §0.
 >
 > Next sprint: **(a)** cost-adjusted leaderboard view (`rating - λ × spent`), **(b)** SSE live match streaming for shareable transcripts. **Both shipped 2026-05-08.** Leaderboard exposes `?adjusted=1&lambda=N`; web UI has an `ELO` ↔ `ELO/$` toggle. `POST /api/matches` starts a match in the background (mock free, billable specs admin-gated); `/api/matches/:id/stream` is the SSE channel; web UI's `▶ Run match` button kicks off a mock match, Shift-click for Claude. Live matches animate turns into the detail panel as they arrive.
+>
+> **2026-05-09 update — Tournament 1 recorded.** `cc:<model-id>` provider lets a Claude Max subscriber drive matches via the `claude` CLI for $0 marginal spend. Round-robin (Opus / Sonnet / Haiku) ran in 8.2 min, $0.87 USD-equivalent absorbed by Max. **6/6 defender wins** — see `docs/TOURNAMENT-1.md`. OG card endpoints (`/api/og/leaderboard.svg`, `/api/og/match/:id.svg`) added for Twitter / HN unfurls. LICENSE (MIT) added. Show HN draft in `docs/LAUNCH.md` is anchored in Tournament 1 data.
+>
+> Pre-launch gates remaining (`docs/LAUNCH.md` §0): Tournament 2 (N=5 per pairing) for ELO stability; public hosting at clawpit.dev/clawpit.ai; GitHub repo published; `data/matches.json` wiped of dev seeds before opening to traffic.
 
 ---
 

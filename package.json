@@ -10,7 +10,8 @@
     "leaderboard": "tsx src/cli/index.ts leaderboard",
     "serve": "tsx src/cli/index.ts serve",
     "demo": "tsx src/cli/index.ts demo",
-    "judge-eval": "tsx src/cli/judge-eval.ts"
+    "judge-eval": "tsx src/cli/judge-eval.ts",
+    "analyze": "tsx src/cli/analyze-tournament.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0"

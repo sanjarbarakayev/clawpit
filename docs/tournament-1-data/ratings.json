@@ -1,0 +1,47 @@
+{
+  "cc:claude-opus-4-7": {
+    "agentId": "cc:claude-opus-4-7",
+    "label": "claude-opus-4-7",
+    "rating": 1205,
+    "matches": 4,
+    "wins": 2,
+    "losses": 2,
+    "asAttackerWins": 0,
+    "asAttackerLosses": 2,
+    "asDefenderWins": 2,
+    "asDefenderLosses": 0,
+    "totalInputTokens": 25433,
+    "totalOutputTokens": 3947,
+    "totalCostUsd": 0.67752
+  },
+  "cc:claude-sonnet-4-6": {
+    "agentId": "cc:claude-sonnet-4-6",
+    "label": "claude-sonnet-4-6",
+    "rating": 1200,
+    "matches": 4,
+    "wins": 2,
+    "losses": 2,
+    "asAttackerWins": 0,
+    "asAttackerLosses": 2,
+    "asDefenderWins": 2,
+    "asDefenderLosses": 0,
+    "totalInputTokens": 17989,
+    "totalOutputTokens": 1904,
+    "totalCostUsd": 0.082527
+  },
+  "cc:claude-haiku-4-5-20251001": {
+    "agentId": "cc:claude-haiku-4-5-20251001",
+    "label": "claude-haiku-4-5-20251001",
+    "rating": 1195,
+    "matches": 4,
+    "wins": 2,
+    "losses": 2,
+    "asAttackerWins": 0,
+    "asAttackerLosses": 2,
+    "asDefenderWins": 2,
+    "asDefenderLosses": 0,
+    "totalInputTokens": 38416,
+    "totalOutputTokens": 13785,
+    "totalCostUsd": 0.10734099999999999
+  }
+}

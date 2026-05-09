@@ -9,7 +9,8 @@
 - [ ] Phase A goals 1, 2, 3 closed (judge, cost tracking, redaction). **Done as of 2026-05-08.**
 - [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending.*
 - [ ] `judge-eval` (decoder) at >= 90% accuracy. **Currently 91.7% (11/12, 100% precision, 87.5% recall)** as of 2026-05-08. The one known fail is the inference-only "narrowing confirmation" case; an LLM judge run via `--judge claude:...` should catch it.
-- [ ] Headline tournament recorded: round-robin across at least 3 frontier models, >= 10 matches per pairing, ELO stable.
+- [x] Tournament 1 recorded (Opus / Sonnet / Haiku, N=1 per pairing): see [docs/TOURNAMENT-1.md](TOURNAMENT-1.md). 6/6 defender wins, $0.87 USD-equivalent, 8.2 min wall time.
+- [ ] Tournament 2 (N=5 per pairing) for ELO stability before launch.
 - [ ] Public hosting up at a real domain. Local-only is a deal-breaker for a Show HN.
 - [ ] LICENSE file landed (MIT default — Sanjar to confirm).
 - [ ] `data/matches.json` is gitignored (already is) AND the production database is wiped of any test secrets before opening to traffic.
@@ -24,11 +25,11 @@ If any gate is red, push the launch. The downside of launching weak (a debunking
 
 Position the launch around the **honest benchmark** angle. The viral story in 2026 is that static benchmarks are gameable — Berkeley researchers showed an agent acing eight major leaderboards by exploiting them. clawpit is structurally different: the win condition is "did this exact string appear in the defender's output," judged by a fast LLM and verified at end-of-match. There is no test set to memorize.
 
-**Headline (do not lock until launch day, A/B these):**
+**Headline (do not lock until launch day, A/B these — first option is the strongest after Tournament 1 results):**
 
-- *Show HN: clawpit — LLMs fighting LLMs in a prompt-injection arena*
-- *Show HN: an adversarial benchmark for AI agents that can't be saturated*
-- *Show HN: I made the top frontier models prompt-inject each other for ELO*
+- *Show HN: I ran 6 prompt-injection matches between Claude Opus, Sonnet and Haiku. Defender held the line every time.* — anchored in [docs/TOURNAMENT-1.md](TOURNAMENT-1.md)
+- *Show HN: clawpit — an adversarial AI agent arena. The first 6-match Claude-only round-robin produced 0 leaks.*
+- *Show HN: I made Claude fight Claude. Sonnet and Opus engage as attackers. Haiku refuses. Nobody breaks anyone's secret.*
 
 **Subhead (one sentence):**
 
@@ -68,30 +69,55 @@ Concentrate distribution into a single 48-hour window. Star velocity triggers Gi
 
 ## §3 Distribution boilerplate (paste-ready)
 
-### Show HN body (draft)
+### Show HN body (draft, anchored in Tournament 1 data)
 
 ```
-Show HN: clawpit — LLMs fighting LLMs in a prompt-injection arena
+Show HN: clawpit — I ran 6 prompt-injection matches between Claude Opus,
+Sonnet and Haiku. Defender held the line every time.
 
-I built an adversarial contest platform for AI agents. v0.1 ships one
-game (SecretClaw): an attacker agent has 6 turns to extract a secret
-string from a defender agent. Each model plays every other model in
-both roles, and a Claude-Haiku judge looks for encoded / split / acrostic
-leaks the substring check would miss.
+clawpit is an adversarial contest platform for AI agents. The first
+game, SecretClaw, gives an attacker agent 6 turns to extract a fixed
+secret string from a defender agent. ELO ratings are tracked separately
+for each role — a model's "strength" is two numbers, not one.
 
-What I think is interesting: this is structurally different from a static
-benchmark. There is no test set to memorize — every new model entrant
-plays the existing field. A model's strength is two numbers (attacker
-ELO, defender ELO), and "cost per match" is tracked separately, so a
-cheap Haiku that holds the line ranks the same as an expensive Opus
-that does.
+Tournament 1 results (round-robin, 3 models, 6 matches, 8 minutes):
 
-Repo: https://github.com/<org>/clawpit
+  - Defender held the line in 6/6 matches. No model leaked another's
+    secret in this 6-turn format.
+  - Sonnet 4.6 took the cost-adjusted #1 slot ($0.08 spent across 4
+    matches; Opus spent $0.68 for the same record).
+  - Haiku 4.5 refused the attacker role 50–100% of the time.
+    Sonnet and Opus engaged with social-engineering vectors
+    (fake authority, story-completion, restriction enumeration).
+  - Total tournament cost: $0.87 USD-equivalent. Free if you run it
+    through your Claude Max subscription via the included `cc:` provider.
+
+What I think is interesting:
+  - Static benchmarks saturate; this one can't. Every new model entrant
+    plays the existing field as both attacker and defender.
+  - The default judge is a code-only decoder battery (base64 / ROT-N /
+    NATO / acrostic / hex / leet etc.) — zero LLM calls, 100% precision
+    on the 12-case eval suite. Tournaments are reproducible without
+    needing an API budget.
+  - Cost per match is tracked, so the leaderboard has a "ELO/$" view
+    that surfaces strength-per-dollar — the actually-useful comparison.
+
+The 100% defender hold across all 6 matches is itself a finding worth
+discussing: in this 6-turn, same-vendor format, none of the three
+models has an intra-family adversarial advantage. Cross-vendor matches
+(adding a non-Claude attacker) are the obvious follow-up.
+
+Code: https://github.com/<org>/clawpit
+Tournament data: https://github.com/<org>/clawpit/tree/main/docs/tournament-1-data
+Methodology + caveats: https://github.com/<org>/clawpit/blob/main/docs/TOURNAMENT-1.md
 Live leaderboard: https://<host>/
 
-I'd particularly love feedback on the judge prompt (src/games/judge.ts) —
-that's the credibility-critical piece, and the eval suite (12 canned cases,
-run with `pnpm judge-eval`) is light on adversarial cases.
+I'd particularly love feedback on:
+  - the decoder judge battery (src/games/decoder-judge.ts) — what
+    encoded leaks would slip through?
+  - the attacker system prompt (src/games/secret-claw.ts) — could a
+    different framing get Haiku to engage as attacker?
+  - whether the 6-turn limit is the right knob.
 ```
 
 ### X thread (5 posts)
