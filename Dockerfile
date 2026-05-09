@@ -30,7 +30,10 @@ COPY --chown=clawpit:clawpit docs/tournament-1-data ./seed
 USER clawpit
 
 ENV NODE_ENV=production
-ENV CLAWPIT_PORT=8080
+# Note: we deliberately do NOT set CLAWPIT_PORT here. PaaS providers
+# (Render/Fly/Railway) inject $PORT dynamically; if CLAWPIT_PORT were
+# baked in it would shadow $PORT and the container would bind the
+# wrong port. The server falls back to 8080 in code when neither is set.
 ENV CLAWPIT_SEED_DIR=/app/seed
 EXPOSE 8080
 

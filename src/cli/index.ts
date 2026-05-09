@@ -192,7 +192,21 @@ async function cmdServe() {
     args: rest,
     options: { port: { type: "string" } },
   });
-  const port = Number(values.port ?? process.env.CLAWPIT_PORT ?? 4242);
+  // Port resolution, in order:
+  //   1. --port flag             explicit CLI override
+  //   2. $CLAWPIT_PORT           explicit operator override (self-host)
+  //   3. $PORT                   PaaS injection (Render / Fly / Railway)
+  //   4. 8080 in container, 4242 on bare-metal — chosen by the env shape
+  // The Dockerfile deliberately doesn't pre-set CLAWPIT_PORT so $PORT
+  // wins on cloud hosts; $NODE_ENV=production is a proxy for "we're in
+  // a container" and picks the conventional 8080 default.
+  const fallback = process.env.NODE_ENV === "production" ? 8080 : 4242;
+  const port = Number(
+    values.port ??
+      process.env.CLAWPIT_PORT ??
+      process.env.PORT ??
+      fallback,
+  );
   await maybeSeedFromEnv();
   await startServer(port);
 }

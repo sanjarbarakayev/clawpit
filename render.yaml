@@ -13,17 +13,16 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
-      - key: CLAWPIT_PORT
-        value: "10000"           # Render injects PORT but we read CLAWPIT_PORT; mirror it via dockerCommand below
+      # Render injects $PORT dynamically. The server reads $PORT directly
+      # (see src/cli/index.ts cmdServe) so we don't need a dockerCommand
+      # override here. CLAWPIT_PORT is intentionally NOT set — letting $PORT
+      # fall through is the path that actually works on Render.
       - key: CLAWPIT_ADMIN_TOKEN
         sync: false              # set in dashboard; never commit a real value
       - key: ANTHROPIC_API_KEY
         sync: false              # only needed for `claude:<model>` agents — most users won't set
       - key: CLAWPIT_SEED_DIR
         value: /app/seed
-    # Render assigns a port via $PORT; we override the Dockerfile CMD so the
-    # server listens on the assigned port instead of the baked-in 8080.
-    dockerCommand: sh -c "CLAWPIT_PORT=$PORT pnpm serve"
     # Uncomment for paid tier with persistent storage so user-run matches
     # survive restarts. Free tier is ephemeral; the seed dataset reseeds on
     # every boot, which is fine for a Show HN demo.
