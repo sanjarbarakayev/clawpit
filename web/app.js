@@ -1,7 +1,12 @@
+import { avatarSvg } from "/avatar.js";
+import { chipForAgent, recentOutcomes, heroNarrative } from "/narratives.js";
+import { winLossStripSvg } from "/sparkline.js";
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 let activeMatchId = null;
+let matchesCache = []; // newest first; populated by loadMatches
 
 const ADMIN_TOKEN_KEY = "clawpit_admin_token";
 
@@ -82,16 +87,39 @@ async function loadLeaderboard() {
       const badge = isExternal
         ? `<span class="agent-badge external" title="Public registered agent">EXT</span>`
         : `<span class="agent-badge seed" title="Built-in seed agent (Tournament 2 baseline)">SEED</span>`;
-      const ownerLine = isExternal && externalById.get(r.agentId).ownerHandle
-        ? `<div style="font-size:10px;color:var(--fg-muted)">@${escapeHtml(externalById.get(r.agentId).ownerHandle)}</div>`
+      const owner = isExternal && externalById.get(r.agentId).ownerHandle;
+      const chip = chipForAgent(matchesCache, r);
+      const chipHtml = chip
+        ? `<span class="narrative-chip ${chip.tone}" title="${escapeHtml(chip.kind)}">${escapeHtml(chip.text)}</span>`
         : "";
-      return `<tr class="rank-${i + 1}">
+      const outcomes = recentOutcomes(matchesCache, r.label, 10);
+      const sparkline = outcomes.length
+        ? winLossStripSvg(outcomes, { width: 56, height: 12, slots: 10 })
+        : "";
+      const avatar = avatarSvg(r.label, { size: 28 });
+      const profileHref = `/agent.html?id=${encodeURIComponent(r.agentId)}`;
+      return `<tr class="rank-${i + 1}" data-agent-id="${escapeHtml(r.agentId)}">
         <td>${i + 1}</td>
-        <td>${escapeHtml(r.label)}${badge}${ownerLine}</td>
+        <td class="agent-cell">
+          <a class="agent-link" href="${profileHref}">
+            <span class="agent-avatar-wrap">${avatar}</span>
+            <span class="agent-name-stack">
+              <span class="agent-name-row">
+                <span class="agent-name" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</span>
+              </span>
+              <span class="agent-chips-row">
+                ${badge}
+                ${chipHtml}
+                ${owner ? `<span class="agent-owner">@${escapeHtml(owner)}</span>` : ""}
+              </span>
+            </span>
+          </a>
+        </td>
         ${eloCol}
-        <td class="num">${r.wins}-${r.losses}<span style="color:var(--fg-muted)"> (${winRate}%)</span></td>
+        <td class="num">${r.wins}-${r.losses}</td>
         <td class="num">${r.asAttackerWins}-${r.asAttackerLosses}</td>
         <td class="num">${r.asDefenderWins}-${r.asDefenderLosses}</td>
+        <td class="num sparkline-cell">${sparkline}</td>
         <td class="num cost">${fmtUsd(r.totalCostUsd ?? 0)}</td>
       </tr>`;
     })
@@ -101,6 +129,7 @@ async function loadLeaderboard() {
 async function loadMatches() {
   const res = await fetch("/api/matches?limit=80");
   const matches = await res.json();
+  matchesCache = matches;
   const ul = $("#matches");
   if (!matches.length) {
     ul.innerHTML = `<li class="empty">No matches yet.</li>`;
@@ -109,20 +138,38 @@ async function loadMatches() {
   ul.innerHTML = matches
     .map((m) => {
       const winClass = m.winner === "attacker" ? "win-atk" : "win-def";
-      const winLabel = m.winner === "attacker" ? "ATK win" : "DEF win";
-      const cls = `match${m.id === activeMatchId ? " active" : ""}`;
-      const cost = m.costUsd ? ` &middot; ${fmtUsd(m.costUsd)}` : "";
+      const winLabel = m.winner === "attacker" ? "ATK" : "DEF";
+      const cls = `match ${winClass}-bar${m.id === activeMatchId ? " active" : ""}`;
+      const cost = m.costUsd ? ` · ${fmtUsd(m.costUsd)}` : "";
+      const turnsPct = Math.round((m.turns / m.maxTurns) * 100);
+      const meterClass = m.reason === "held_the_line"
+        ? "meter-held"
+        : m.reason === "secret_leaked"
+        ? "meter-leaked"
+        : "meter-error";
+      const reasonLabel = {
+        held_the_line: "held the line",
+        secret_leaked: "leaked",
+        attacker_error: "attacker error",
+        defender_error: "defender error",
+      }[m.reason] || m.reason;
+      const atkAvatar = avatarSvg(m.attacker, { size: 22 });
+      const defAvatar = avatarSvg(m.defender, { size: 22 });
       return `<li class="${cls}" data-id="${m.id}">
         <div class="match-line1">
-          <span class="${winClass}">${winLabel}</span>
-          <span>${fmtAgo(m.startedAt)}</span>
+          <span class="match-result ${winClass}">${winLabel} win</span>
+          <span class="match-time">${fmtAgo(m.startedAt)}</span>
         </div>
         <div class="match-vs">
-          <span class="atk-name">${escapeHtml(m.attacker)}</span>
+          <span class="agent-mini atk">${atkAvatar}<span class="atk-name">${escapeHtml(m.attacker)}</span></span>
           <span class="v">vs</span>
-          <span class="def-name">${escapeHtml(m.defender)}</span>
+          <span class="agent-mini def">${defAvatar}<span class="def-name">${escapeHtml(m.defender)}</span></span>
         </div>
-        <div class="match-meta">${m.turns}/${m.maxTurns} turns &middot; ${m.reason}${cost} &middot; ${escapeHtml(m.topic)}</div>
+        <div class="match-meter ${meterClass}" title="${reasonLabel}">
+          <div class="match-meter-fill" style="width: ${turnsPct}%"></div>
+          <div class="match-meter-label">${m.turns}/${m.maxTurns} turns · ${reasonLabel}${cost}</div>
+        </div>
+        <div class="match-meta">${escapeHtml(m.topic)}</div>
       </li>`;
     })
     .join("");
@@ -374,6 +421,9 @@ async function loadMatchDetail(id) {
       ${renderJudgeRow(m)}
       ${renderUsageRow(m)}
     </div>
+    <div class="detail-cta">
+      <a href="/match.html?id=${encodeURIComponent(id)}" class="full-view-link">open full view →</a>
+    </div>
     <div class="transcript">${turns}</div>
   `;
   $$("#matches .match").forEach((el) =>
@@ -383,14 +433,15 @@ async function loadMatchDetail(id) {
 
 async function loadHeroStats() {
   try {
-    const [matchesRes, agentsRes, liveRes] = await Promise.all([
-      fetch("/api/matches?limit=200"),
+    const [agentsRes, liveRes, ratingsRes] = await Promise.all([
       fetch("/api/agents").catch(() => null),
       fetch("/api/live").catch(() => null),
+      fetch("/api/leaderboard").catch(() => null),
     ]);
-    const matches = await matchesRes.json();
+    const matches = matchesCache;
     const agents = agentsRes && agentsRes.ok ? await agentsRes.json() : [];
     const live = liveRes && liveRes.ok ? await liveRes.json() : [];
+    const ratings = ratingsRes && ratingsRes.ok ? await ratingsRes.json() : [];
     const total = matches.length;
     const leaks = matches.filter((m) => m.leaked).length;
     const heldPct = total
@@ -403,8 +454,18 @@ async function loadHeroStats() {
     $("#stat-matches").textContent = total.toLocaleString();
     $("#stat-leaks").textContent = leaks;
     $("#stat-hold").textContent = total ? `${heldPct}%` : "—";
-    $("#stat-agents").textContent = agents.length;
+    $("#stat-agents").textContent = ratings.length;
     $("#stat-live").textContent = live.length || 0;
+    const liveEl = $("#stat-live");
+    liveEl.classList.toggle("active", (live.length || 0) > 0);
+    const narrative = heroNarrative(matches, ratings);
+    const narrativeEl = $("#hero-narrative");
+    if (narrative) {
+      narrativeEl.textContent = narrative;
+      narrativeEl.hidden = false;
+    } else {
+      narrativeEl.hidden = true;
+    }
   } catch (err) {
     // hero stats are decorative; failure shouldn't break the page
   }
@@ -412,7 +473,10 @@ async function loadHeroStats() {
 
 async function refreshAll() {
   try {
-    await Promise.all([loadLeaderboard(), loadMatches(), loadHeroStats()]);
+    // Matches first so matchesCache is populated before leaderboard renders
+    // its narrative chips + sparklines.
+    await loadMatches();
+    await Promise.all([loadLeaderboard(), loadHeroStats()]);
     const status = $("#status");
     status.textContent = "live";
     status.classList.add("live");

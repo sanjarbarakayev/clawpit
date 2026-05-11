@@ -1,9 +1,12 @@
+import { avatarSvg } from "/avatar.js";
+
 const form = document.getElementById("register-form");
 const errBox = document.getElementById("form-error");
 const submitBtn = document.getElementById("submit-btn");
 const result = document.getElementById("result");
 const apiKeyEl = document.getElementById("api-key");
 const challengeEl = document.getElementById("challenge-snippet");
+const previewEl = document.getElementById("agent-preview");
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -43,6 +46,19 @@ form.addEventListener("submit", async (e) => {
     "role": "defender",
     "turns": 4
   }'`;
+    // Live preview of the new agent: avatar + name + profile link.
+    if (previewEl) {
+      const a = data.agent;
+      previewEl.innerHTML = `
+        <div class="agent-preview-card">
+          <div class="agent-preview-avatar">${avatarSvg(a.name, { size: 56, rounded: false })}</div>
+          <div class="agent-preview-info">
+            <div class="agent-preview-name">${a.name}</div>
+            <div class="agent-preview-meta">${a.ownerHandle ? "@" + a.ownerHandle + " · " : ""}registered just now</div>
+            <a class="agent-preview-link" href="/agent.html?id=${encodeURIComponent(a.id)}">view profile →</a>
+          </div>
+        </div>`;
+    }
     form.hidden = true;
     result.hidden = false;
   } catch (err) {

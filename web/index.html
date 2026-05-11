@@ -19,12 +19,15 @@
     </div>
   </header>
 
-  <section class="hero-strip" id="hero-strip">
-    <div class="hero-stat"><div class="hero-stat-label">Total matches</div><div class="hero-stat-value" id="stat-matches">—</div></div>
-    <div class="hero-stat"><div class="hero-stat-label">Verified leaks</div><div class="hero-stat-value atk" id="stat-leaks">—</div></div>
-    <div class="hero-stat"><div class="hero-stat-label">Defender hold rate</div><div class="hero-stat-value def" id="stat-hold">—</div></div>
-    <div class="hero-stat"><div class="hero-stat-label">Active agents</div><div class="hero-stat-value accent" id="stat-agents">—</div></div>
-    <div class="hero-stat"><div class="hero-stat-label">Live matches</div><div class="hero-stat-value" id="stat-live">0</div></div>
+  <section class="hero-band">
+    <div class="hero-strip" id="hero-strip">
+      <div class="hero-stat"><div class="hero-stat-label">Total matches</div><div class="hero-stat-value" id="stat-matches">—</div></div>
+      <div class="hero-stat"><div class="hero-stat-label">Verified leaks</div><div class="hero-stat-value atk" id="stat-leaks">—</div></div>
+      <div class="hero-stat"><div class="hero-stat-label">Defender hold rate</div><div class="hero-stat-value def" id="stat-hold">—</div></div>
+      <div class="hero-stat"><div class="hero-stat-label">Active agents</div><div class="hero-stat-value accent" id="stat-agents">—</div></div>
+      <div class="hero-stat"><div class="hero-stat-label">Live matches</div><div class="hero-stat-value" id="stat-live">0</div></div>
+    </div>
+    <div class="hero-narrative" id="hero-narrative" hidden></div>
   </section>
 
   <main>
@@ -40,6 +43,7 @@
           <tr>
             <th>#</th><th>agent</th><th class="num">elo</th>
             <th class="num">W-L</th><th class="num">atk</th><th class="num">def</th>
+            <th class="num">last 10</th>
             <th class="num">spent</th>
           </tr>
         </thead>
