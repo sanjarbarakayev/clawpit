@@ -11,6 +11,7 @@
  * deliver a verdict, so every match costs at least one judge call.
  */
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import Anthropic from "@anthropic-ai/sdk";
 import type {
   Agent,
@@ -114,30 +115,15 @@ interface DebateJudgement {
   note?: string;
 }
 
-/**
- * Hidden judge call. Reads the full transcript and decides who made the
- * stronger case. The judge is told explicitly NOT to be swayed by which
- * position aligns with its own opinions.
- */
-async function judgeDebate(
+function buildJudgePrompt(
   statement: string,
   transcript: TranscriptEntry[],
-  modelId: string,
-): Promise<DebateJudgement> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return {
-      winner: "pro", // arbitrary fallback; caller should detect via note
-      reasoning: "judge unavailable (no ANTHROPIC_API_KEY); defaulting to PRO",
-      note: "no-judge",
-    };
-  }
-  const client = new Anthropic({ apiKey });
+): string {
   const proTurns = transcript.filter((t) => t.role === "attacker");
   const conTurns = transcript.filter((t) => t.role === "defender");
   const renderSide = (label: string, turns: TranscriptEntry[]) =>
     turns.map((t, i) => `${label} turn ${i + 1}: ${t.content.trim()}`).join("\n\n");
-  const prompt = `Statement under debate: "${statement}"
+  return `Statement under debate: "${statement}"
 
 Two sides argued. Read both sides in full.
 
@@ -154,6 +140,140 @@ Your job: decide which side made the stronger case. You must:
 
 Reply with one JSON object and nothing else:
 { "winner": "pro" | "con", "reasoning": "two-to-four sentences explaining the call" }`;
+}
+
+function parseJudgeReply(raw: string, modelId: string): DebateJudgement {
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) {
+    return {
+      winner: "pro",
+      reasoning: `judge returned no JSON: ${raw.slice(0, 200)}`,
+      note: "parse-error",
+    };
+  }
+  try {
+    const parsed = JSON.parse(m[0]);
+    const winner = parsed.winner === "con" ? "con" : "pro";
+    const reasoning = String(parsed.reasoning ?? "").slice(0, 800);
+    return { winner, reasoning };
+  } catch (err: any) {
+    return {
+      winner: "pro",
+      reasoning: `judge JSON parse failed: ${err?.message ?? "unknown"}`,
+      note: "parse-error",
+    };
+  }
+}
+
+/**
+ * Run the judge via the local `claude` CLI (subscription-backed) when no
+ * ANTHROPIC_API_KEY is set. Mirrors the cc:* agent pattern: spawn the CLI
+ * with the same context-disabling flags so the cost stays close to a direct
+ * API call. Returns a `cli-error` note on failure so the caller can fall
+ * back gracefully.
+ */
+async function judgeViaCli(
+  statement: string,
+  transcript: TranscriptEntry[],
+  modelId: string,
+): Promise<DebateJudgement> {
+  const prompt = buildJudgePrompt(statement, transcript);
+  const system =
+    "You are a strict debate judge. You reply with exactly one JSON object and no commentary outside of it.";
+  const args = [
+    "-p", prompt,
+    "--model", modelId,
+    "--output-format", "json",
+    "--tools", "",
+    "--system-prompt", system,
+    "--strict-mcp-config",
+    "--mcp-config", '{"mcpServers":{}}',
+    "--setting-sources", "",
+    "--disable-slash-commands",
+    "--no-session-persistence",
+  ];
+  return new Promise((resolve) => {
+    const proc = spawn("claude", args, {
+      env: { ...process.env, CI: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    const timer = setTimeout(() => {
+      proc.kill("SIGTERM");
+      resolve({
+        winner: "pro",
+        reasoning: "judge CLI timed out (60s)",
+        note: "cli-error",
+      });
+    }, 60_000);
+    proc.stdout.on("data", (c) => (stdout += c.toString("utf8")));
+    proc.on("close", () => {
+      clearTimeout(timer);
+      const jsonStart = stdout.indexOf("{");
+      if (jsonStart < 0) {
+        resolve({
+          winner: "pro",
+          reasoning: "judge CLI returned no JSON",
+          note: "cli-error",
+        });
+        return;
+      }
+      try {
+        const cliResult = JSON.parse(stdout.slice(jsonStart)) as {
+          result?: string;
+          is_error?: boolean;
+          usage?: {
+            input_tokens?: number;
+            output_tokens?: number;
+          };
+        };
+        const usage = {
+          model: modelId,
+          inputTokens: cliResult.usage?.input_tokens ?? 0,
+          outputTokens: cliResult.usage?.output_tokens ?? 0,
+        };
+        if (cliResult.is_error || !cliResult.result) {
+          resolve({
+            winner: "pro",
+            reasoning: `judge CLI is_error: ${(cliResult.result ?? "no message").slice(0, 200)}`,
+            note: "cli-error",
+            usage,
+          });
+          return;
+        }
+        const parsed = parseJudgeReply(cliResult.result, modelId);
+        resolve({ ...parsed, usage });
+      } catch (err: any) {
+        resolve({
+          winner: "pro",
+          reasoning: `judge CLI parse failed: ${err?.message ?? "unknown"}`,
+          note: "cli-error",
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Hidden judge call. Reads the full transcript and decides who made the
+ * stronger case. The judge is told explicitly NOT to be swayed by which
+ * position aligns with its own opinions. Routes to API when
+ * ANTHROPIC_API_KEY is set, otherwise to the `claude` CLI subprocess so the
+ * Max subscription quota covers it.
+ */
+async function judgeDebate(
+  statement: string,
+  transcript: TranscriptEntry[],
+  modelId: string,
+): Promise<DebateJudgement> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    // No API key — try the local Claude CLI (Max subscription). This is the
+    // common path for hobbyist demos.
+    return judgeViaCli(statement, transcript, modelId);
+  }
+  const client = new Anthropic({ apiKey });
+  const prompt = buildJudgePrompt(statement, transcript);
   try {
     const res = await client.messages.create({
       model: modelId,
@@ -168,25 +288,9 @@ Reply with one JSON object and nothing else:
       .map((b) => b.text)
       .join("\n")
       .trim();
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) {
-      return {
-        winner: "pro",
-        reasoning: `judge returned no JSON: ${raw.slice(0, 200)}`,
-        note: "parse-error",
-        usage: {
-          model: modelId,
-          inputTokens: res.usage?.input_tokens ?? 0,
-          outputTokens: res.usage?.output_tokens ?? 0,
-        },
-      };
-    }
-    const parsed = JSON.parse(match[0]);
-    const winner = parsed.winner === "con" ? "con" : "pro";
-    const reasoning = String(parsed.reasoning ?? "").slice(0, 800);
+    const parsed = parseJudgeReply(raw, modelId);
     return {
-      winner,
-      reasoning,
+      ...parsed,
       usage: {
         model: modelId,
         inputTokens: res.usage?.input_tokens ?? 0,

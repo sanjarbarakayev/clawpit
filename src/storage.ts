@@ -139,12 +139,30 @@ export async function recordMatch(match: MatchResult): Promise<{
 function recordTeamMatch(match: MatchResult, ratings: Record<string, Rating>) {
   if (!match.participants) return;
   const winningRole = match.teamWinner === "werewolves" ? "werewolf" : "villager";
-  const winners = match.participants.filter((p) => p.role === winningRole);
-  const losers = match.participants.filter((p) => p.role !== winningRole);
+  // Dedup by underlying agent id — when the same model backs multiple slots
+  // (e.g. two Haiku instances both as villagers) we still only credit the
+  // underlying rating row once per match. Edge case: an agent that backs
+  // BOTH a wolf and a villager slot. We let it count as the winning side
+  // (slight imprecision is better than corrupting the loser's rating).
+  const seen = new Set<string>();
+  const winners = match.participants.filter(
+    (p) => p.role === winningRole && !seen.has(p.id) && seen.add(p.id),
+  );
+  const loserSeen = new Set<string>([...seen]);
+  const losers = match.participants.filter(
+    (p) => p.role !== winningRole && !loserSeen.has(p.id) && loserSeen.add(p.id),
+  );
   if (winners.length === 0 || losers.length === 0) return;
 
-  const winnerRows = winners.map((p) => ensureRating(ratings, p.id, p.label));
-  const loserRows = losers.map((p) => ensureRating(ratings, p.id, p.label));
+  // Use the underlying agent label (model id) for the Rating row, not the
+  // in-game slot persona — otherwise "Bob" overwrites "claude-haiku-4-5..."
+  // in the leaderboard.
+  const winnerRows = winners.map((p) =>
+    ensureRating(ratings, p.id, p.agentLabel ?? p.label),
+  );
+  const loserRows = losers.map((p) =>
+    ensureRating(ratings, p.id, p.agentLabel ?? p.label),
+  );
 
   const winnerAvg =
     winnerRows.reduce((s, r) => s + r.rating, 0) / winnerRows.length;
@@ -170,10 +188,10 @@ function recordTeamMatch(match: MatchResult, ratings: Record<string, Rating>) {
   // shim, so map that here. Token counts mirror that split.
   const wolfRows = match.participants
     .filter((p) => p.role === "werewolf")
-    .map((p) => ensureRating(ratings, p.id, p.label));
+    .map((p) => ensureRating(ratings, p.id, p.agentLabel ?? p.label));
   const villRows = match.participants
     .filter((p) => p.role === "villager")
-    .map((p) => ensureRating(ratings, p.id, p.label));
+    .map((p) => ensureRating(ratings, p.id, p.agentLabel ?? p.label));
   const splitInto = (rows: Rating[], side: { inputTokens: number; outputTokens: number; costUsd: number }) => {
     if (rows.length === 0) return;
     const inT = Math.floor(side.inputTokens / rows.length);

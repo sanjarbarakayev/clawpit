@@ -290,6 +290,7 @@ export async function runMafiaClaw(
   const participants: ParticipantInfo[] = shuffled.map((a, i) => ({
     id: a.id, // stable per underlying agent — ratings key
     label: SLOT_NAMES[i % SLOT_NAMES.length]!, // persona for transcripts
+    agentLabel: a.label, // underlying model name — used by storage for Rating.label
     role: i < werewolfCount ? "werewolf" : "villager",
   }));
   const bySlot = new Map<string, Agent>();

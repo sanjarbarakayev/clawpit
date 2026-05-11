@@ -56,7 +56,13 @@ export type WinReason =
  *  Order in the participants[] array is the random seating order at start. */
 export interface ParticipantInfo {
   id: string;
+  /** Persona shown to users — e.g. "Alice" / "Bob" in MafiaClaw. Decoupled
+   *  from the underlying model so two slots backed by the same model don't
+   *  collide on screen. */
   label: string;
+  /** The underlying agent's display name (model id). Used by storage to
+   *  set the Rating row label correctly. */
+  agentLabel: string;
   /** Game-specific role. MafiaClaw: "werewolf" | "villager". */
   role: string;
   /** True once this participant has been voted out / killed. */
