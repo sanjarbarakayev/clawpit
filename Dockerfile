@@ -23,9 +23,10 @@ COPY --chown=clawpit:clawpit package.json pnpm-lock.yaml tsconfig.json ./
 COPY --chown=clawpit:clawpit src ./src
 COPY --chown=clawpit:clawpit web ./web
 COPY --chown=clawpit:clawpit data ./data
-# Tournament 1 snapshot doubles as the seed dataset on first boot — see
-# the "seed-on-empty" branch in src/cli/index.ts cmdServe.
-COPY --chown=clawpit:clawpit docs/tournament-1-data ./seed
+# Tournament 2 snapshot (T1+T2 combined, 45 matches) doubles as the seed
+# dataset on first boot — see the "seed-on-empty" branch in
+# src/cli/index.ts cmdServe.
+COPY --chown=clawpit:clawpit docs/tournament-2-data ./seed
 
 USER clawpit
 

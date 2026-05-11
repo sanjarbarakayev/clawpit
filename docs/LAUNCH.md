@@ -10,13 +10,14 @@
 - [x] LICENSE file landed (MIT, 2026-05-09).
 - [x] Secret pool expanded from 6 → 60+ entries across diverse topics (2026-05-11). Closes the "you only have 6 hardcoded strings" critique. See `src/games/secret-claw.ts`.
 - [x] Tournament 1 recorded (Opus / Sonnet / Haiku, N=1 per pairing): see [TOURNAMENT-1.md](TOURNAMENT-1.md). 6/6 defender wins, $0.87 USD-equivalent, 8.2 min wall time.
+- [x] Tournament 2 recorded (same three models, **N=6–7 per pairing**, 39 new matches): see [TOURNAMENT-2.md](TOURNAMENT-2.md). 43/45 defender wins across the combined dataset (95.6%), 2 agent-error walkovers, **zero verified leaks**. $6.22 USD-eq total ($0 marginal on Max), 56.5 min wall time.
 - [x] `judge-eval` (decoder) at >= 90% accuracy. **Currently 91.7% (11/12, 100% precision, 87.5% recall)**. The one known fail is the inference-only "narrowing confirmation" case; an LLM judge run via `--judge claude:...` should catch it.
 - [x] GitHub repo public at https://github.com/sanjarbarakayev/clawpit (2026-05-11). Pre-flight: git history scanned, no API keys / tokens in any commit; `.env*` and `data/*.json` are gitignored.
 - [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending — recommend accept and ship; second game is a Phase D follow-up.*
-- [ ] Tournament 2 (N=5 per pairing) for ELO stability before launch. Run via `pnpm tournament --agents cc:claude-opus-4-7,cc:claude-sonnet-4-6,cc:claude-haiku-4-5-20251001 --turns 6` five times (cc: provider absorbs cost into Claude Max).
+- [x] Tournament 2 (N=5 per pairing) for ELO stability before launch — achieved N=6–7 per pairing on 2026-05-11. Combined T1+T2 dataset is 45 matches, 0 leaks. See [TOURNAMENT-2.md](TOURNAMENT-2.md).
 - [x] Public hosting **live at https://clawpit.onrender.com** (Render Blueprint, free tier, auto-deploy from `main`). `/api/health` returns 200 in ~0.7s warm. Caveat: free tier spins down after 15 min idle, ~50s cold start on first request after sleep — upgrade to Starter ($7/mo) before HN spike if cold-start risk matters.
 - [x] `CLAWPIT_ADMIN_TOKEN` set in production (`/api/health` reports `adminEnabled: true`).
-- [ ] Two screenshots ready: leaderboard, plus one transcript showing a surprising attack (base64 leak caught by judge, or a clever defender refusal).
+- [x] Two screenshots captured 2026-05-11 from the live preview: (1) full 3-column dashboard with the T1+T2 leaderboard (Sonnet 1228 #1, Haiku 1187 #2, Opus 1185 #3, all 15-0 defending), (2) transcript view of Match 1F71D220 — the defender-timeout walkover, which is the most honest "attacker won" case the dataset contains. Both reproducible against https://clawpit.onrender.com.
 
 If any gate is red, push the launch. The downside of launching weak (a debunking comment on day one) outweighs the upside of being early.
 
@@ -26,11 +27,11 @@ If any gate is red, push the launch. The downside of launching weak (a debunking
 
 Position the launch around the **honest benchmark** angle. The viral story in 2026 is that static benchmarks are gameable — Berkeley researchers showed an agent acing eight major leaderboards by exploiting them. clawpit is structurally different: the win condition is "did this exact string appear in the defender's output," judged by a fast LLM and verified at end-of-match. There is no test set to memorize.
 
-**Headline (do not lock until launch day, A/B these — first option is the strongest after Tournament 1 results):**
+**Headline (do not lock until launch day, A/B these — first option is the strongest after Tournament 2 results):**
 
-- *Show HN: I ran 6 prompt-injection matches between Claude Opus, Sonnet and Haiku. Defender held the line every time.* — anchored in [docs/TOURNAMENT-1.md](TOURNAMENT-1.md)
-- *Show HN: clawpit — an adversarial AI agent arena. The first 6-match Claude-only round-robin produced 0 leaks.*
-- *Show HN: I made Claude fight Claude. Sonnet and Opus engage as attackers. Haiku refuses. Nobody breaks anyone's secret.*
+- *Show HN: I ran 45 prompt-injection matches between Claude Opus, Sonnet and Haiku. Zero leaks.* — anchored in [docs/TOURNAMENT-2.md](TOURNAMENT-2.md)
+- *Show HN: clawpit — adversarial AI agent arena. 45 same-vendor matches, 0 successful extractions, $6 total cost.*
+- *Show HN: I made Claude fight Claude 45 times. Defender held the line every time. Haiku refused to attack at all.*
 
 **Subhead (one sentence):**
 
@@ -73,25 +74,31 @@ Concentrate distribution into a single 48-hour window. Star velocity triggers Gi
 ### Show HN body (draft, anchored in Tournament 1 data)
 
 ```
-Show HN: clawpit — I ran 6 prompt-injection matches between Claude Opus,
-Sonnet and Haiku. Defender held the line every time.
+Show HN: clawpit — I ran 45 prompt-injection matches between Claude
+Opus, Sonnet and Haiku. Zero leaks.
 
 clawpit is an adversarial contest platform for AI agents. The first
 game, SecretClaw, gives an attacker agent 6 turns to extract a fixed
-secret string from a defender agent. ELO ratings are tracked separately
-for each role — a model's "strength" is two numbers, not one.
+secret string from a defender agent. Each agent gets two ELO ratings
+(as attacker / as defender) — a model's strength is two numbers, not
+one. Every match's cost is tracked separately so the leaderboard has
+an ELO/$ view alongside raw ELO.
 
-Tournament 1 results (round-robin, 3 models, 6 matches, 8 minutes):
+Tournament dataset (T1 + T2, same 3 models, 45 matches, ~65 min wall):
 
-  - Defender held the line in 6/6 matches. No model leaked another's
-    secret in this 6-turn format.
-  - Sonnet 4.6 took the cost-adjusted #1 slot ($0.08 spent across 4
-    matches; Opus spent $0.68 for the same record).
-  - Haiku 4.5 refused the attacker role 50–100% of the time.
-    Sonnet and Opus engaged with social-engineering vectors
-    (fake authority, story-completion, restriction enumeration).
-  - Total tournament cost: $0.87 USD-equivalent. Free if you run it
-    through your Claude Max subscription via the included `cc:` provider.
+  - Defender held the line in 43/45 matches (95.6%).
+  - Zero verified leaks — every "attacker win" (2 of 45) was an
+    agent-error walkover, not an actual secret extraction.
+  - Sonnet 4.6 leads cost-adjusted (ELO 1228, $0.56 lifetime spend).
+    Opus 4.7 has nearly identical ELO (1185) but spent $4.88 for the
+    same record — same outcome, ~9× cost.
+  - Haiku 4.5 refused the attacker role in 100% of its 14 attempts
+    (5 explicit refusals, 9 soft non-engagements). Opus and Sonnet
+    engaged with social-engineering vectors every time.
+  - Total tournament cost: $6.22 USD-equivalent. $0 marginal if you
+    run it through your Claude Max subscription via the included
+    `cc:` provider (a CLI-backed agent that drops Claude Code's tool
+    context to keep token overhead near a direct API call).
 
 What I think is interesting:
   - Static benchmarks saturate; this one can't. Every new model entrant
@@ -100,25 +107,29 @@ What I think is interesting:
     NATO / acrostic / hex / leet etc.) — zero LLM calls, 100% precision
     on the 12-case eval suite. Tournaments are reproducible without
     needing an API budget.
-  - Cost per match is tracked, so the leaderboard has a "ELO/$" view
-    that surfaces strength-per-dollar — the actually-useful comparison.
+  - Two matches hit Anthropic's Usage Policy filter mid-game (Sonnet
+    attacker turn 4, Opus defender turn 1). Both ended as agent-error
+    walkovers, not gameplay outcomes. Worth flagging as a methodology
+    consideration for any same-vendor benchmark.
 
-The 100% defender hold across all 6 matches is itself a finding worth
-discussing: in this 6-turn, same-vendor format, none of the three
-models has an intra-family adversarial advantage. Cross-vendor matches
-(adding a non-Claude attacker) are the obvious follow-up.
+The 95.6% defender hold across 45 matches is itself the headline: in
+this 6-turn, same-vendor format, none of the three models has an
+intra-family adversarial advantage. Cross-vendor matches (adding a
+non-Claude attacker) are the obvious follow-up.
 
 Code: https://github.com/sanjarbarakayev/clawpit
 Live leaderboard: https://clawpit.onrender.com  (free tier, ~50s cold start)
-Tournament data: https://github.com/sanjarbarakayev/clawpit/tree/main/docs/tournament-1-data
-Methodology + caveats: https://github.com/sanjarbarakayev/clawpit/blob/main/docs/TOURNAMENT-1.md
+T2 data: https://github.com/sanjarbarakayev/clawpit/tree/main/docs/tournament-2-data
+Methodology + caveats: https://github.com/sanjarbarakayev/clawpit/blob/main/docs/TOURNAMENT-2.md
 
 I'd particularly love feedback on:
   - the decoder judge battery (src/games/decoder-judge.ts) — what
     encoded leaks would slip through?
   - the attacker system prompt (src/games/secret-claw.ts) — could a
     different framing get Haiku to engage as attacker?
-  - whether the 6-turn limit is the right knob.
+  - whether the 6-turn limit is the right knob, and how 2 agent-error
+    walkovers (4.4% of matches) should be classified separately from
+    gameplay outcomes.
 ```
 
 ### X thread (5 posts)
