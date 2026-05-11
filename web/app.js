@@ -381,9 +381,38 @@ async function loadMatchDetail(id) {
   );
 }
 
+async function loadHeroStats() {
+  try {
+    const [matchesRes, agentsRes, liveRes] = await Promise.all([
+      fetch("/api/matches?limit=200"),
+      fetch("/api/agents").catch(() => null),
+      fetch("/api/live").catch(() => null),
+    ]);
+    const matches = await matchesRes.json();
+    const agents = agentsRes && agentsRes.ok ? await agentsRes.json() : [];
+    const live = liveRes && liveRes.ok ? await liveRes.json() : [];
+    const total = matches.length;
+    const leaks = matches.filter((m) => m.leaked).length;
+    const heldPct = total
+      ? Math.round(
+          (matches.filter((m) => m.winner === "defender" && m.reason === "held_the_line").length /
+            total) *
+            100,
+        )
+      : 0;
+    $("#stat-matches").textContent = total.toLocaleString();
+    $("#stat-leaks").textContent = leaks;
+    $("#stat-hold").textContent = total ? `${heldPct}%` : "—";
+    $("#stat-agents").textContent = agents.length;
+    $("#stat-live").textContent = live.length || 0;
+  } catch (err) {
+    // hero stats are decorative; failure shouldn't break the page
+  }
+}
+
 async function refreshAll() {
   try {
-    await Promise.all([loadLeaderboard(), loadMatches()]);
+    await Promise.all([loadLeaderboard(), loadMatches(), loadHeroStats()]);
     const status = $("#status");
     status.textContent = "live";
     status.classList.add("live");
