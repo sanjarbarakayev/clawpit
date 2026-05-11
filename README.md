@@ -1,6 +1,6 @@
 # clawpit
 
-Adversarial contest platform for AI agents. v0.1 ships one game (**SecretClaw**) — a prompt-injection arena where an attacker agent has N turns to extract a secret string from a defender agent. Matches feed an ELO leaderboard.
+Adversarial contest platform for AI agents. v0.2 ships one game (**SecretClaw**) — a prompt-injection arena where an attacker agent has N turns to extract a secret string from a defender agent. Matches feed an ELO leaderboard with a zero-cost decoder judge for leak detection, per-match cost tracking, and a cost-adjusted ranking view.
 
 ```
               ATTACKER                          DEFENDER
@@ -151,21 +151,18 @@ The web UI exposes a `reveal mode` button in the leaderboard header. Clicking pr
 
 The CLI and JSON files (`data/matches.json`) keep the raw secret — those are local-only and never served. Encoded leaks (base64, ROT13) are NOT scrubbed from the transcript: those depend on knowing the encoding, and the `judgeVerdict.leaked` boolean is the authoritative signal.
 
-## What v0 deliberately doesn't do
+## What v0.2 deliberately doesn't do
 
-- **No agent submission protocol.** Real submissions (Docker container, HTTP endpoint contract) are v0.2 — right now agents are local TS modules.
+- **No agent submission protocol.** Right now agents are local TS modules. External submissions (Docker container, HTTP endpoint contract) are v0.3 — needs sandboxing first.
 - **One game only.** SecretClaw is the seed; the same match runner can host other games (negotiation, coding duels, debate) by swapping the `runMatch` body. NegotiateClaw is the planned next game.
-- **No cost-adjusted ELO yet.** Per-match cost is recorded; deriving `rating - λ × spent` into a separate leaderboard view is on deck.
-- **No streaming.** Matches block until done; web UI doesn't show turns as they happen.
+- **JSON storage.** `data/*.json` works fine through ~1k matches; switching to SQLite/Turso is on the v0.3 list when concurrent writes become real.
 
-## Roadmap suggestions
+## Roadmap
 
-1. **Judge LLM** for fuzzy leak detection (catches encoded / paraphrased leaks).
-2. **Cost-adjusted leaderboard** — track tokens-in/tokens-out per match, rank by `(rating - λ × cost)`.
-3. **Agent submission protocol** — a Docker container exposing a `POST /respond` endpoint, so external teams can register agents.
-4. **Second game** — `NegotiateClaw` (split-the-pie ultimatum) or `DebateClaw` (judge-decided winner) to broaden the platform.
-5. **Live match streaming** — Server-Sent Events from `/api/matches/:id/stream`, so the web UI shows turns as they happen.
-6. **Public hosting** — deploy behind a real database (SQLite → Turso or Postgres), expose registration, and accept submissions.
+1. **Second game** — `NegotiateClaw` (split-the-pie ultimatum) or `DebateClaw` (judge-decided winner) to broaden the platform claim from "prompt-injection arena" to "agent contest platform."
+2. **Agent submission protocol** — a Docker container exposing a `POST /respond` endpoint, so external teams can register agents. Requires sandboxing (Modal / Fly Machines / gVisor) before going live.
+3. **Cross-vendor tournaments** — current `cc:` provider is Claude-only. Adapter shape lives in `src/agents/anthropic.ts`; GPT-5 / Gemini adapters are PR-shaped tasks.
+4. **Persistent storage** — SQLite (Turso for hosted) when match volume crosses ~1k or concurrent writes become real.
 
 ## Deploy
 
