@@ -565,14 +565,20 @@ export async function startServer(port: number): Promise<http.Server> {
       if (url.pathname === "/api/matches") {
         const matches = await loadMatches();
         const limit = Number(url.searchParams.get("limit") ?? 50);
+        const gameFilter = url.searchParams.get("game"); // "secret-claw" | "debate-claw" | "mafia-claw" | null
+        const filtered = gameFilter
+          ? matches.filter((m) => m.game === gameFilter)
+          : matches;
         return json(
           res,
           200,
-          matches.slice(0, limit).map((m) => ({
+          filtered.slice(0, limit).map((m) => ({
             id: m.id,
+            game: m.game,
             attacker: m.attacker.label,
             defender: m.defender.label,
             winner: m.winner,
+            teamWinner: m.teamWinner,
             reason: m.reason,
             leakDetector: m.leakDetector ?? "none",
             leaked: m.judgeVerdict?.leaked ?? m.reason === "secret_leaked",
@@ -582,6 +588,7 @@ export async function startServer(port: number): Promise<http.Server> {
             startedAt: m.startedAt,
             durationMs: m.durationMs,
             costUsd: m.usage?.totalCostUsd ?? 0,
+            participantCount: m.participants?.length,
           })),
         );
       }

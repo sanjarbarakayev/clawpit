@@ -39,13 +39,34 @@ export interface TranscriptEntry {
   ts: number;
 }
 
+/** The game mode a match was played in. Each game has its own orchestration
+ *  in src/games/<game>.ts and (eventually) its own ELO ladder. */
+export type Game = "secret-claw" | "debate-claw" | "mafia-claw";
+
 export type WinReason =
-  | "secret_leaked"
-  | "held_the_line"
+  | "secret_leaked"     // SecretClaw: defender leaked the secret
+  | "held_the_line"     // SecretClaw: defender survived all turns
+  | "judge_decision"    // DebateClaw: LLM judge picked the winner
+  | "werewolves_uncovered" // MafiaClaw: all werewolves voted out
+  | "werewolves_overran"   // MafiaClaw: werewolves reached parity (W >= V)
   | "attacker_error"
   | "defender_error";
 
-/** How a leak was detected — substring match, LLM judge, or not at all. */
+/** N-agent game participant (MafiaClaw and future multi-agent games).
+ *  Order in the participants[] array is the random seating order at start. */
+export interface ParticipantInfo {
+  id: string;
+  label: string;
+  /** Game-specific role. MafiaClaw: "werewolf" | "villager". */
+  role: string;
+  /** True once this participant has been voted out / killed. */
+  eliminated?: boolean;
+  /** Which round (1-indexed) the participant left the game, if any. */
+  eliminationRound?: number;
+}
+
+/** How a leak (or judgement) was detected — substring match, LLM judge,
+ *  or not applicable. */
 export type LeakDetector = "substring" | "judge" | "none";
 
 export interface JudgeVerdict {
@@ -96,10 +117,15 @@ export interface MatchUsage {
 
 export interface MatchResult {
   id: string;
-  game: "secret-claw";
+  /** Which game this match was played in. */
+  game: Game;
   attacker: { id: string; label: string };
   defender: { id: string; label: string };
+  /** SecretClaw: the secret string the defender was guarding.
+   *  DebateClaw: empty (the "topic" field holds the statement being debated). */
   secret: string;
+  /** SecretClaw: short flavour string about the secret's domain.
+   *  DebateClaw: the full controversial statement being debated. */
   topic: string;
   winner: Role;
   reason: WinReason;
@@ -115,6 +141,14 @@ export interface MatchResult {
   startedAt: string;
   endedAt: string;
   durationMs: number;
+  /** N-agent games only (MafiaClaw). For 1v1 games (SecretClaw, DebateClaw)
+   *  this is undefined and `attacker` / `defender` carry the agents. For
+   *  N-agent games attacker/defender mirror the first two participants as
+   *  a compat shim — the participants[] list is the source of truth. */
+  participants?: ParticipantInfo[];
+  /** N-agent games only. The semantic winning side (e.g. "werewolves"
+   *  / "villagers"). For 1v1 games, see `winner` ("attacker"/"defender"). */
+  teamWinner?: string;
 }
 
 export interface Rating {

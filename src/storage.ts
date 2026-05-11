@@ -78,6 +78,17 @@ export async function recordMatch(match: MatchResult): Promise<{
   await writeJson(MATCHES_FILE, capped);
 
   const ratings = await loadRatings();
+
+  // N-agent games (MafiaClaw) need team-based ELO + per-participant tracking.
+  // Routed to a helper below so the 1v1 path stays untouched.
+  if (match.game === "mafia-claw" && match.participants && match.participants.length > 0) {
+    recordTeamMatch(match, ratings);
+    await writeJson(RATINGS_FILE, ratings);
+    const att = ensureRating(ratings, match.attacker.id, match.attacker.label);
+    const def = ensureRating(ratings, match.defender.id, match.defender.label);
+    return { attackerRating: att, defenderRating: def };
+  }
+
   const att = ensureRating(ratings, match.attacker.id, match.attacker.label);
   const def = ensureRating(ratings, match.defender.id, match.defender.label);
 
@@ -113,4 +124,67 @@ export async function recordMatch(match: MatchResult): Promise<{
 
   await writeJson(RATINGS_FILE, ratings);
   return { attackerRating: att, defenderRating: def };
+}
+
+/**
+ * Team-based ELO for N-agent games. Each participant gets:
+ *   - +1 match
+ *   - +1 win OR +1 loss based on team result
+ *   - rating delta vs. the team-average rating of the opposing side (Elo K/N)
+ *
+ * Per-role columns (asAttackerWins / asDefenderWins) are NOT updated — those
+ * are 1v1 specific. We attribute cost evenly across the participants since
+ * MatchUsage.attacker/defender don't carry per-agent breakdown for Mafia.
+ */
+function recordTeamMatch(match: MatchResult, ratings: Record<string, Rating>) {
+  if (!match.participants) return;
+  const winningRole = match.teamWinner === "werewolves" ? "werewolf" : "villager";
+  const winners = match.participants.filter((p) => p.role === winningRole);
+  const losers = match.participants.filter((p) => p.role !== winningRole);
+  if (winners.length === 0 || losers.length === 0) return;
+
+  const winnerRows = winners.map((p) => ensureRating(ratings, p.id, p.label));
+  const loserRows = losers.map((p) => ensureRating(ratings, p.id, p.label));
+
+  const winnerAvg =
+    winnerRows.reduce((s, r) => s + r.rating, 0) / winnerRows.length;
+  const loserAvg =
+    loserRows.reduce((s, r) => s + r.rating, 0) / loserRows.length;
+  const update = updateRatings(winnerAvg, loserAvg);
+  const winnerDelta = update.winner - winnerAvg;
+  const loserDelta = update.loser - loserAvg;
+
+  for (const r of winnerRows) {
+    r.rating = Math.round(r.rating + winnerDelta);
+    r.matches += 1;
+    r.wins += 1;
+  }
+  for (const r of loserRows) {
+    r.rating = Math.round(r.rating + loserDelta);
+    r.matches += 1;
+    r.losses += 1;
+  }
+
+  // Cost split across all participants equally — Mafia bucketing in
+  // MafiaClaw uses attacker=werewolf-side / defender=villager-side as a
+  // shim, so map that here. Token counts mirror that split.
+  const wolfRows = match.participants
+    .filter((p) => p.role === "werewolf")
+    .map((p) => ensureRating(ratings, p.id, p.label));
+  const villRows = match.participants
+    .filter((p) => p.role === "villager")
+    .map((p) => ensureRating(ratings, p.id, p.label));
+  const splitInto = (rows: Rating[], side: { inputTokens: number; outputTokens: number; costUsd: number }) => {
+    if (rows.length === 0) return;
+    const inT = Math.floor(side.inputTokens / rows.length);
+    const outT = Math.floor(side.outputTokens / rows.length);
+    const cost = side.costUsd / rows.length;
+    for (const r of rows) {
+      r.totalInputTokens += inT;
+      r.totalOutputTokens += outT;
+      r.totalCostUsd += cost;
+    }
+  };
+  splitInto(wolfRows, match.usage.attacker);
+  splitInto(villRows, match.usage.defender);
 }

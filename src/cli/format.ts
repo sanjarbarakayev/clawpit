@@ -14,14 +14,37 @@ const C = {
 };
 
 export function printMatch(m: MatchResult, opts: { full?: boolean } = {}) {
+  const isDebate = m.game === "debate-claw";
+  const isMafia = m.game === "mafia-claw";
   const winColor = m.winner === "attacker" ? C.red : C.green;
-  const winLabel = m.winner === "attacker" ? "ATTACKER" : "DEFENDER";
+  const winLabel = isMafia
+    ? (m.teamWinner ?? (m.winner === "attacker" ? "WEREWOLVES" : "VILLAGERS")).toUpperCase()
+    : isDebate
+    ? m.winner === "attacker" ? "PRO" : "CON"
+    : m.winner === "attacker" ? "ATTACKER" : "DEFENDER";
+  const gameName = isMafia ? "MafiaClaw" : isDebate ? "DebateClaw" : "SecretClaw";
   console.log("");
-  console.log(`${C.bold}─── SecretClaw match ${m.id.slice(0, 8)} ───${C.reset}`);
-  console.log(`${C.red}attacker${C.reset}  ${m.attacker.label}`);
-  console.log(`${C.green}defender${C.reset}  ${m.defender.label}`);
-  console.log(`${C.dim}topic${C.reset}     ${m.topic}`);
-  console.log(`${C.dim}secret${C.reset}    ${m.secret}`);
+  console.log(`${C.bold}─── ${gameName} match ${m.id.slice(0, 8)} ───${C.reset}`);
+  if (isMafia && m.participants) {
+    console.log(`${C.dim}participants${C.reset}`);
+    for (const p of m.participants) {
+      const roleColor = p.role === "werewolf" ? C.red : C.green;
+      const mark = p.eliminated ? "✗" : "•";
+      console.log(`  ${mark} ${p.label} ${roleColor}${p.role}${C.reset}${p.eliminated ? ` (out R${p.eliminationRound})` : ""}`);
+    }
+    console.log(`${C.dim}setup${C.reset}     ${m.topic}`);
+  } else {
+    const roleLeft = isDebate ? "pro" : "attacker";
+    const roleRight = isDebate ? "con" : "defender";
+    console.log(`${C.red}${roleLeft}${C.reset}  ${m.attacker.label}`);
+    console.log(`${C.green}${roleRight}${C.reset}  ${m.defender.label}`);
+    if (isDebate) {
+      console.log(`${C.dim}statement${C.reset} ${m.topic}`);
+    } else {
+      console.log(`${C.dim}topic${C.reset}     ${m.topic}`);
+      console.log(`${C.dim}secret${C.reset}    ${m.secret}`);
+    }
+  }
   console.log(
     `${C.dim}turns${C.reset}     ${m.turns}/${m.maxTurns}   ${C.dim}duration${C.reset} ${(m.durationMs / 1000).toFixed(1)}s`,
   );
@@ -31,12 +54,17 @@ export function printMatch(m: MatchResult, opts: { full?: boolean } = {}) {
   }
   if (m.judgeVerdict) {
     const v = m.judgeVerdict;
-    const tag = v.leaked ? `${C.red}LEAK${C.reset}` : `${C.green}clean${C.reset}`;
+    const tag = isDebate
+      ? `${C.bold}${winLabel} wins${C.reset}`
+      : v.leaked
+      ? `${C.red}LEAK${C.reset}`
+      : `${C.green}clean${C.reset}`;
     const model = v.model || "(noop)";
     const stage = v.stage;
     console.log(`${C.dim}judge${C.reset}     ${tag}  ${model}  [${stage}]`);
-    if (v.leaked && v.evidence) {
-      console.log(`${C.dim}evidence${C.reset}  ${v.evidence}`);
+    // Show the judge's reasoning for debates always; for SecretClaw only on leak.
+    if (v.evidence && (isDebate || v.leaked)) {
+      console.log(`${C.dim}reasoning${C.reset} ${v.evidence}`);
     }
     if (v.note) {
       console.log(`${C.dim}note${C.reset}      ${v.note}`);

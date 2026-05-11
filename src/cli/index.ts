@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 import { resolveAgent } from "../agents/registry.ts";
-import { runMatch, runTournament } from "../arena.ts";
+import { runMatch, runMafiaMatch, runTournament } from "../arena.ts";
 import { loadMatches, loadRatings } from "../storage.ts";
 import { startServer } from "../server.ts";
 import { claudeJudge, noopJudge } from "../games/judge.ts";
@@ -96,13 +96,63 @@ async function cmdMatch() {
     options: {
       attacker: { type: "string" },
       defender: { type: "string" },
+      // mafia-claw is N-agent — pass --agents instead of --attacker/--defender
+      agents: { type: "string" },
+      werewolves: { type: "string" },
+      rounds: { type: "string" },
       turns: { type: "string" },
       seed: { type: "string" },
       quiet: { type: "boolean" },
       judge: { type: "string" },
       "no-judge": { type: "boolean" },
+      game: { type: "string" },
     },
   });
+  const game = (values.game ?? "secret-claw") as
+    | "secret-claw"
+    | "debate-claw"
+    | "mafia-claw";
+  if (
+    game !== "secret-claw" &&
+    game !== "debate-claw" &&
+    game !== "mafia-claw"
+  ) {
+    console.error(
+      `unknown --game ${game} (expected secret-claw | debate-claw | mafia-claw)`,
+    );
+    process.exit(1);
+  }
+
+  if (game === "mafia-claw") {
+    if (!values.agents) {
+      console.error(
+        "mafia-claw needs --agents <spec,spec,…> with 4-7 comma-separated agent specs",
+      );
+      process.exit(1);
+    }
+    const agents = values.agents
+      .split(",")
+      .map((s) => resolveAgent(s.trim()))
+      .filter(Boolean);
+    if (agents.length < 4 || agents.length > 9) {
+      console.error(
+        `mafia-claw needs 4-9 agents (got ${agents.length}). 5 is the standard demo size.`,
+      );
+      process.exit(1);
+    }
+    const werewolves = values.werewolves ? Number(values.werewolves) : 1;
+    const maxRounds = values.rounds ? Number(values.rounds) : 3;
+    const result = await runMafiaMatch(agents, {
+      game,
+      participantCount: agents.length,
+      werewolves,
+      maxRounds,
+      seed: values.seed ? Number(values.seed) : undefined,
+    });
+    printMatch(result, { full: !values.quiet });
+    return;
+  }
+
   if (!values.attacker || !values.defender) {
     console.error("--attacker and --defender are required");
     process.exit(1);
@@ -113,8 +163,10 @@ async function cmdMatch() {
     noJudge: values["no-judge"],
     judge: values.judge,
   });
+  const defaultTurns = game === "debate-claw" ? 3 : 6;
   const result = await runMatch(attacker, defender, {
-    maxTurns: values.turns ? Number(values.turns) : 6,
+    game,
+    maxTurns: values.turns ? Number(values.turns) : defaultTurns,
     seed: values.seed ? Number(values.seed) : undefined,
     judge,
   });
@@ -129,10 +181,16 @@ async function cmdTournament() {
       turns: { type: "string" },
       judge: { type: "string" },
       "no-judge": { type: "boolean" },
+      game: { type: "string" },
     },
   });
   if (!values.agents) {
     console.error("--agents is required (comma-separated specs)");
+    process.exit(1);
+  }
+  const game = (values.game ?? "secret-claw") as "secret-claw" | "debate-claw";
+  if (game !== "secret-claw" && game !== "debate-claw") {
+    console.error(`unknown --game ${game}`);
     process.exit(1);
   }
   const agents = values.agents.split(",").map((s) => resolveAgent(s.trim()));
@@ -140,9 +198,11 @@ async function cmdTournament() {
     noJudge: values["no-judge"],
     judge: values.judge,
   });
-  console.log(`Running round-robin (${agents.length} agents, both roles)…`);
+  const defaultTurns = game === "debate-claw" ? 3 : 6;
+  console.log(`Running ${game} round-robin (${agents.length} agents, both roles)…`);
   const matches = await runTournament(agents, {
-    maxTurns: values.turns ? Number(values.turns) : 6,
+    game,
+    maxTurns: values.turns ? Number(values.turns) : defaultTurns,
     judge,
   });
   console.log(`\n${matches.length} matches complete.\n`);

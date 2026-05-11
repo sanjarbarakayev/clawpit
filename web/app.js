@@ -137,34 +137,65 @@ async function loadMatches() {
   }
   ul.innerHTML = matches
     .map((m) => {
-      const winClass = m.winner === "attacker" ? "win-atk" : "win-def";
-      const winLabel = m.winner === "attacker" ? "ATK" : "DEF";
+      const isMafia = m.game === "mafia-claw";
+      const isDebate = m.game === "debate-claw";
+      let winClass, winLabel;
+      if (isMafia) {
+        winClass = m.teamWinner === "werewolves" ? "win-atk" : "win-def";
+        winLabel = m.teamWinner === "werewolves" ? "WOLVES" : "VILLAGERS";
+      } else if (isDebate) {
+        winClass = m.winner === "attacker" ? "win-atk" : "win-def";
+        winLabel = m.winner === "attacker" ? "PRO" : "CON";
+      } else {
+        winClass = m.winner === "attacker" ? "win-atk" : "win-def";
+        winLabel = m.winner === "attacker" ? "ATK" : "DEF";
+      }
       const cls = `match ${winClass}-bar${m.id === activeMatchId ? " active" : ""}`;
       const cost = m.costUsd ? ` · ${fmtUsd(m.costUsd)}` : "";
-      const turnsPct = Math.round((m.turns / m.maxTurns) * 100);
+      const turnsPct = Math.round((m.turns / Math.max(m.maxTurns, 1)) * 100);
       const meterClass = m.reason === "held_the_line"
         ? "meter-held"
         : m.reason === "secret_leaked"
         ? "meter-leaked"
+        : m.reason === "werewolves_uncovered"
+        ? "meter-held"
+        : m.reason === "werewolves_overran"
+        ? "meter-leaked"
+        : m.reason === "judge_decision"
+        ? "meter-held"
         : "meter-error";
       const reasonLabel = {
         held_the_line: "held the line",
         secret_leaked: "leaked",
         attacker_error: "attacker error",
         defender_error: "defender error",
+        judge_decision: "judge decision",
+        werewolves_uncovered: "all wolves uncovered",
+        werewolves_overran: "wolves overran",
       }[m.reason] || m.reason;
+      const gameBadge = isMafia
+        ? `<span class="game-pill game-mafia">MAFIA · ${m.participantCount ?? 5}</span>`
+        : isDebate
+        ? `<span class="game-pill game-debate">DEBATE</span>`
+        : `<span class="game-pill game-secret">SECRET</span>`;
       const atkAvatar = avatarSvg(m.attacker, { size: 22 });
       const defAvatar = avatarSvg(m.defender, { size: 22 });
-      return `<li class="${cls}" data-id="${m.id}">
-        <div class="match-line1">
-          <span class="match-result ${winClass}">${winLabel} win</span>
-          <span class="match-time">${fmtAgo(m.startedAt)}</span>
-        </div>
-        <div class="match-vs">
+      const vsLine = isMafia
+        ? `<div class="match-vs"><span class="agent-mini">${atkAvatar}<span class="atk-name">${m.participantCount ?? "?"}-way Mafia</span></span></div>`
+        : `<div class="match-vs">
           <span class="agent-mini atk">${atkAvatar}<span class="atk-name">${escapeHtml(m.attacker)}</span></span>
           <span class="v">vs</span>
           <span class="agent-mini def">${defAvatar}<span class="def-name">${escapeHtml(m.defender)}</span></span>
+        </div>`;
+      return `<li class="${cls}" data-id="${m.id}">
+        <div class="match-line1">
+          <span class="match-result ${winClass}">${winLabel} win</span>
+          <div class="match-line1-right">
+            ${gameBadge}
+            <span class="match-time">${fmtAgo(m.startedAt)}</span>
+          </div>
         </div>
+        ${vsLine}
         <div class="match-meter ${meterClass}" title="${reasonLabel}">
           <div class="match-meter-fill" style="width: ${turnsPct}%"></div>
           <div class="match-meter-label">${m.turns}/${m.maxTurns} turns · ${reasonLabel}${cost}</div>
@@ -431,6 +462,43 @@ async function loadMatchDetail(id) {
   );
 }
 
+function loadGamesStrip(matches) {
+  const counts = { "secret-claw": 0, "debate-claw": 0, "mafia-claw": 0 };
+  for (const m of matches) {
+    // Backfill: matches recorded before the multi-game split don't carry
+    // a `game` field. Treat anything missing as SecretClaw.
+    const g = m.game || "secret-claw";
+    if (counts[g] !== undefined) counts[g]++;
+  }
+  const setText = (sel, val) => { const el = $(sel); if (el) el.textContent = val; };
+  setText("#games-strip-secret", counts["secret-claw"]);
+  setText("#games-strip-debate", counts["debate-claw"]);
+  setText("#games-strip-mafia", counts["mafia-claw"]);
+}
+
+let activeGameFilter = null; // null = all
+function setupGamesStripClicks() {
+  $$("#games-strip-grid .game-card").forEach((el) => {
+    el.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const game = el.dataset.game;
+      activeGameFilter = activeGameFilter === game ? null : game;
+      $$("#games-strip-grid .game-card").forEach((c) => {
+        c.classList.toggle("active", activeGameFilter === c.dataset.game);
+      });
+      filterMatchListByGame();
+    });
+  });
+}
+function filterMatchListByGame() {
+  $$("#matches .match").forEach((el) => {
+    const id = el.dataset.id;
+    const m = matchesCache.find((x) => x.id === id);
+    const game = m?.game || "secret-claw";
+    el.hidden = activeGameFilter && game !== activeGameFilter;
+  });
+}
+
 async function loadHeroStats() {
   try {
     const [agentsRes, liveRes, ratingsRes] = await Promise.all([
@@ -476,6 +544,8 @@ async function refreshAll() {
     // Matches first so matchesCache is populated before leaderboard renders
     // its narrative chips + sparklines.
     await loadMatches();
+    loadGamesStrip(matchesCache);
+    filterMatchListByGame();
     await Promise.all([loadLeaderboard(), loadHeroStats()]);
     const status = $("#status");
     status.textContent = "live";
@@ -518,5 +588,6 @@ function setupRunMatch() {
 setupRankToggle();
 setupAdminToggle();
 setupRunMatch();
+setupGamesStripClicks();
 refreshAll();
 setInterval(refreshAll, 5000);

@@ -152,10 +152,110 @@ function setStatus(text, klass) {
 
 let ratingsByIdCache = null;
 
+function renderMafiaHead(m) {
+  const participants = m.participants ?? [];
+  const finished = !!m.endedAt;
+  const teamWinner = m.teamWinner ?? (m.winner === "attacker" ? "werewolves" : "villagers");
+  const winnerLabel = teamWinner === "werewolves" ? "WEREWOLVES WIN" : "VILLAGERS WIN";
+  const reasonLabel = {
+    werewolves_uncovered: "all werewolves uncovered",
+    werewolves_overran: "werewolves reached parity",
+    attacker_error: "agent error",
+    defender_error: "agent error",
+  }[m.reason] || m.reason;
+  const grid = participants
+    .map((p) => {
+      const dead = p.eliminated;
+      const showRole = finished;
+      const roleTag = showRole
+        ? `<div class="mafia-role mafia-role-${p.role}">${p.role}</div>`
+        : `<div class="mafia-role mafia-role-hidden">role hidden</div>`;
+      return `<a class="mafia-participant ${dead ? "eliminated" : ""}" href="/agent.html?id=${encodeURIComponent(p.id)}">
+        <div class="mafia-avatar">${avatarSvg(p.label, { size: 56, rounded: false })}</div>
+        <div class="mafia-info">
+          <div class="mafia-name">${escapeHtml(p.label)}</div>
+          ${roleTag}
+          ${dead ? `<div class="mafia-elim">eliminated R${p.eliminationRound}</div>` : finished ? `<div class="mafia-survived">survived</div>` : ""}
+        </div>
+      </a>`;
+    })
+    .join("");
+  const cost = m.usage?.totalCostUsd ?? 0;
+  return `
+    <section class="mafia-head">
+      <div class="mafia-banner">
+        <div class="mafia-topic">${escapeHtml(m.topic)}</div>
+        <div class="mafia-winner ${teamWinner}">
+          <span class="mafia-winner-label">${winnerLabel}</span>
+          <span class="mafia-winner-reason">${reasonLabel}</span>
+        </div>
+      </div>
+      <div class="mafia-roster">${grid}</div>
+      <div class="mafia-meta">
+        ${m.durationMs ? `<span>duration: <strong>${(m.durationMs / 1000).toFixed(1)}s</strong></span>` : ""}
+        ${cost ? `<span>cost: <strong style="color:var(--gold)">${fmtUsd(cost)}</strong></span>` : ""}
+        <span>turns: <strong>${m.turns ?? 0}</strong></span>
+      </div>
+    </section>`;
+}
+
+function renderMafiaTranscript(transcript) {
+  if (!transcript || transcript.length === 0) {
+    return `<section class="transcript-section">
+      <h2>Transcript</h2>
+      <div class="match-loading">no turns yet — waiting…</div>
+    </section>`;
+  }
+  // Group entries by round. Entries are tagged "[label · round N · discussion]"
+  // or "[round N result] ...". Parse the round number out.
+  const groups = new Map();
+  for (const t of transcript) {
+    const m = (t.content || "").match(/round (\d+)/i);
+    const round = m ? Number(m[1]) : 0;
+    if (!groups.has(round)) groups.set(round, []);
+    groups.get(round).push(t);
+  }
+  const blocks = [];
+  for (const [round, entries] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    const items = entries
+      .map((t) => {
+        const isVerdict = /^\[round \d+ result\]/.test(t.content || "");
+        const isError = /\bERROR\]/.test(t.content || "");
+        const headerMatch = (t.content || "").match(/^\[([^\]]+)\]\s*(.*)$/s);
+        const head = headerMatch ? headerMatch[1] : "";
+        const body = headerMatch ? headerMatch[2] : t.content;
+        const cls = isError
+          ? "mafia-msg error"
+          : isVerdict
+          ? "mafia-msg verdict"
+          : t.role === "attacker"
+          ? "mafia-msg wolf"
+          : "mafia-msg vill";
+        return `<div class="${cls}">
+          <div class="mafia-msg-head">${escapeHtml(head)}</div>
+          <div class="mafia-msg-body">${escapeHtml(body)}</div>
+        </div>`;
+      })
+      .join("");
+    blocks.push(`<div class="mafia-round">
+      <div class="mafia-round-head">Round ${round || "—"}</div>
+      ${items}
+    </div>`);
+  }
+  return `<section class="transcript-section">
+    <h2>Transcript (${transcript.length} entries)</h2>
+    <div class="mafia-transcript">${blocks.join("")}</div>
+  </section>`;
+}
+
 async function renderFull(m) {
   if (!ratingsByIdCache) ratingsByIdCache = await fetchRatingsById();
   const isLive = !m.endedAt;
   setStatus(isLive ? "live" : "finished", isLive ? "live" : "finished");
+  if (m.game === "mafia-claw") {
+    root.innerHTML = renderMafiaHead(m) + renderMafiaTranscript(m.transcript);
+    return;
+  }
   root.innerHTML =
     renderHead(m, ratingsByIdCache, isLive) +
     renderTranscript(m.transcript) +

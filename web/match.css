@@ -259,3 +259,180 @@ main.match-main {
   .bubble { max-width: 92%; }
   .fighter-avatar svg { width: 56px; height: 56px; }
 }
+
+/* ---------------- MafiaClaw view ---------------- */
+.mafia-head {
+  padding: 24px 0 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.mafia-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.mafia-topic {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  max-width: 60ch;
+}
+.mafia-winner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+.mafia-winner.werewolves { background: var(--atk-soft); border-color: rgba(236, 106, 106, 0.3); }
+.mafia-winner.villagers { background: var(--def-soft); border-color: rgba(93, 185, 138, 0.3); }
+.mafia-winner-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mafia-winner.werewolves .mafia-winner-label { color: var(--atk); }
+.mafia-winner.villagers .mafia-winner-label { color: var(--def); }
+.mafia-winner-reason { font-size: 11px; color: var(--fg-muted); font-family: var(--mono); }
+
+.mafia-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.mafia-participant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.12s;
+  position: relative;
+}
+.mafia-participant:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.mafia-participant.eliminated { opacity: 0.45; }
+.mafia-participant.eliminated::after {
+  content: "✗";
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--atk);
+  font-weight: 700;
+}
+.mafia-avatar svg { width: 56px; height: 56px; border-radius: 50%; }
+.mafia-info { text-align: center; }
+.mafia-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mafia-role {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-top: 6px;
+  display: inline-block;
+}
+.mafia-role-werewolf {
+  color: var(--atk);
+  background: var(--atk-soft);
+  border: 1px solid rgba(236, 106, 106, 0.3);
+}
+.mafia-role-villager {
+  color: var(--def);
+  background: var(--def-soft);
+  border: 1px solid rgba(93, 185, 138, 0.3);
+}
+.mafia-role-hidden {
+  color: var(--fg-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+}
+.mafia-elim { font-size: 10.5px; color: var(--fg-muted); margin-top: 4px; font-family: var(--mono); }
+.mafia-survived { font-size: 10.5px; color: var(--def); margin-top: 4px; font-family: var(--mono); }
+
+.mafia-meta {
+  display: flex;
+  gap: 18px;
+  padding-top: 16px;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  font-family: var(--mono);
+  flex-wrap: wrap;
+}
+.mafia-meta strong { color: var(--fg); font-weight: 500; }
+
+.mafia-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.mafia-round {
+  border-left: 2px solid var(--border-subtle);
+  padding: 4px 0 4px 20px;
+}
+.mafia-round-head {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.mafia-msg {
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.mafia-msg.wolf { border-left: 3px solid var(--atk); }
+.mafia-msg.vill { border-left: 3px solid var(--def); }
+.mafia-msg.verdict {
+  background: var(--surface-2);
+  border-color: var(--border);
+  border-left: 3px solid var(--accent);
+}
+.mafia-msg.error {
+  background: var(--warn-soft);
+  border-color: rgba(212, 165, 87, 0.3);
+}
+.mafia-msg-head {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.mafia-msg.wolf .mafia-msg-head { color: var(--atk); }
+.mafia-msg.vill .mafia-msg-head { color: var(--def); }
+.mafia-msg.verdict .mafia-msg-head { color: var(--accent-text); }
+.mafia-msg-body { color: var(--fg); }
+.mafia-msg.verdict .mafia-msg-body { color: var(--fg-dim); font-family: var(--mono); font-size: 12px; }

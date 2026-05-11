@@ -309,6 +309,36 @@ table td:first-child {
   color: var(--fg-muted);
   font-weight: 500;
 }
+.match-line1-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.game-pill {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.game-pill.game-secret {
+  background: rgba(131, 103, 255, 0.12);
+  color: var(--accent-text);
+  border-color: rgba(131, 103, 255, 0.22);
+}
+.game-pill.game-debate {
+  background: rgba(212, 165, 87, 0.12);
+  color: var(--gold);
+  border-color: rgba(212, 165, 87, 0.28);
+}
+.game-pill.game-mafia {
+  background: rgba(236, 106, 106, 0.1);
+  color: var(--atk);
+  border-color: rgba(236, 106, 106, 0.28);
+}
 .match-vs {
   display: flex;
   align-items: center;
@@ -663,6 +693,78 @@ footer a:hover { color: var(--fg); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ---- Game modes strip ---- */
+.games-strip {
+  padding: 18px 24px 22px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg);
+}
+.games-strip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.games-strip-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent-text);
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: -0.005em;
+}
+.games-strip-link:hover { color: var(--fg); }
+.games-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.game-card {
+  display: block;
+  padding: 16px 18px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.14s;
+  position: relative;
+}
+.game-card:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+.game-card.active { border-color: var(--accent); background: var(--accent-soft); }
+.game-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.game-card-secret .game-card-name { color: var(--accent-text); }
+.game-card-debate .game-card-name { color: var(--gold); }
+.game-card-mafia .game-card-name { color: var(--atk); }
+.game-card-desc {
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.game-card-stat {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+}
+.game-card-stat span { color: var(--fg); font-weight: 500; }
 
 /* ---- Detail CTA: open full match view ---- */
 .detail-cta { margin: -4px 0 14px; }
