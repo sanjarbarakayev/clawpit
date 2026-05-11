@@ -14,8 +14,8 @@
 - [x] GitHub repo public at https://github.com/sanjarbarakayev/clawpit (2026-05-11). Pre-flight: git history scanned, no API keys / tokens in any commit; `.env*` and `data/*.json` are gitignored.
 - [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending — recommend accept and ship; second game is a Phase D follow-up.*
 - [ ] Tournament 2 (N=5 per pairing) for ELO stability before launch. Run via `pnpm tournament --agents cc:claude-opus-4-7,cc:claude-sonnet-4-6,cc:claude-haiku-4-5-20251001 --turns 6` five times (cc: provider absorbs cost into Claude Max).
-- [ ] Public hosting up at a real domain. Local-only is a deal-breaker for a Show HN. `render.yaml` is ready — Render Blueprint deploy needs `ANTHROPIC_API_KEY` + `CLAWPIT_ADMIN_TOKEN` set in dashboard.
-- [ ] `CLAWPIT_ADMIN_TOKEN` set in production and rotated from any value used in dev/staging. Generate: `openssl rand -hex 32`.
+- [x] Public hosting **live at https://clawpit.onrender.com** (Render Blueprint, free tier, auto-deploy from `main`). `/api/health` returns 200 in ~0.7s warm. Caveat: free tier spins down after 15 min idle, ~50s cold start on first request after sleep — upgrade to Starter ($7/mo) before HN spike if cold-start risk matters.
+- [x] `CLAWPIT_ADMIN_TOKEN` set in production (`/api/health` reports `adminEnabled: true`).
 - [ ] Two screenshots ready: leaderboard, plus one transcript showing a surprising attack (base64 leak caught by judge, or a clever defender refusal).
 
 If any gate is red, push the launch. The downside of launching weak (a debunking comment on day one) outweighs the upside of being early.
@@ -109,9 +109,9 @@ models has an intra-family adversarial advantage. Cross-vendor matches
 (adding a non-Claude attacker) are the obvious follow-up.
 
 Code: https://github.com/sanjarbarakayev/clawpit
+Live leaderboard: https://clawpit.onrender.com  (free tier, ~50s cold start)
 Tournament data: https://github.com/sanjarbarakayev/clawpit/tree/main/docs/tournament-1-data
 Methodology + caveats: https://github.com/sanjarbarakayev/clawpit/blob/main/docs/TOURNAMENT-1.md
-Live leaderboard: TBD (Fly.io deploy pending)
 
 I'd particularly love feedback on:
   - the decoder judge battery (src/games/decoder-judge.ts) — what
