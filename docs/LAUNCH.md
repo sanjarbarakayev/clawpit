@@ -8,13 +8,14 @@
 
 - [x] Phase A goals 1, 2, 3 closed (judge, cost tracking, redaction). **Done 2026-05-08.**
 - [x] LICENSE file landed (MIT, 2026-05-09).
-- [x] GitHub repo public at https://github.com/sanjarbarakayev/clawpit (2026-05-09).
+- [x] Secret pool expanded from 6 → 60+ entries across diverse topics (2026-05-11). Closes the "you only have 6 hardcoded strings" critique. See `src/games/secret-claw.ts`.
 - [x] Tournament 1 recorded (Opus / Sonnet / Haiku, N=1 per pairing): see [TOURNAMENT-1.md](TOURNAMENT-1.md). 6/6 defender wins, $0.87 USD-equivalent, 8.2 min wall time.
 - [x] `judge-eval` (decoder) at >= 90% accuracy. **Currently 91.7% (11/12, 100% precision, 87.5% recall)**. The one known fail is the inference-only "narrowing confirmation" case; an LLM judge run via `--judge claude:...` should catch it.
-- [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending.*
-- [ ] Tournament 2 (N=5 per pairing) for ELO stability before launch.
-- [ ] Public hosting up at a real domain. Local-only is a deal-breaker for a Show HN.
-- [ ] `CLAWPIT_ADMIN_TOKEN` set in production and rotated from any value used in dev/staging.
+- [ ] **GitHub repo public.** Currently private at https://github.com/sanjarbarakayev/clawpit — flip via `gh repo edit sanjarbarakayev/clawpit --visibility public` or the Settings UI. Pre-flight done 2026-05-11: git history scanned, no API keys / tokens in any commit; `.env*` and `data/*.json` are gitignored. Safe to publish.
+- [ ] Second game (NegotiateClaw) live, OR explicitly accept "platform claim is one-game-only" in launch copy. *Decision pending — recommend accept and ship; second game is a Phase D follow-up.*
+- [ ] Tournament 2 (N=5 per pairing) for ELO stability before launch. Run via `pnpm tournament --agents cc:claude-opus-4-7,cc:claude-sonnet-4-6,cc:claude-haiku-4-5-20251001 --turns 6` five times (cc: provider absorbs cost into Claude Max).
+- [ ] Public hosting up at a real domain. Local-only is a deal-breaker for a Show HN. `render.yaml` is ready — Render Blueprint deploy needs `ANTHROPIC_API_KEY` + `CLAWPIT_ADMIN_TOKEN` set in dashboard.
+- [ ] `CLAWPIT_ADMIN_TOKEN` set in production and rotated from any value used in dev/staging. Generate: `openssl rand -hex 32`.
 - [ ] Two screenshots ready: leaderboard, plus one transcript showing a surprising attack (base64 leak caught by judge, or a clever defender refusal).
 
 If any gate is red, push the launch. The downside of launching weak (a debunking comment on day one) outweighs the upside of being early.
