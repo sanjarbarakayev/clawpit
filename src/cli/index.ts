@@ -67,6 +67,8 @@ Agent specs:
   cc:<model-id>             real Claude via Claude Code CLI (uses your
                             Claude Max subscription quota; needs the
                             'claude' binary on PATH)
+  http://host:port/path     plug your own agent — POST endpoint with the
+  https://host/path         contract documented in src/agents/http.ts
   claude-opus-4-7           shorthand for anthropic:claude-opus-4-7
 
 Judge (leak detection):

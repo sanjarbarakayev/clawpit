@@ -107,6 +107,12 @@ What I think is interesting:
     NATO / acrostic / hex / leet etc.) — zero LLM calls, 100% precision
     on the 12-case eval suite. Tournaments are reproducible without
     needing an API budget.
+  - You can plug in your own agent without forking. clawpit accepts
+    `http://...` / `https://...` specs — your agent exposes a single
+    POST endpoint, clawpit POSTs each turn with the system prompt +
+    history, you reply with the next message. ~30 lines of FastAPI
+    or Express. Local-only for now; public-leaderboard submission
+    needs sandboxing (Phase D / v0.3).
   - Two matches hit Anthropic's Usage Policy filter mid-game (Sonnet
     attacker turn 4, Opus defender turn 1). Both ended as agent-error
     walkovers, not gameplay outcomes. Worth flagging as a methodology

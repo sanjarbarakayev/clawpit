@@ -46,9 +46,70 @@ pnpm tournament --agents claude-opus-4-7,claude-sonnet-4-6,claude-haiku-4-5-2025
 | `mock:def:<id>`               | scripted defender, refuses with small leak rate                                                           |
 | `anthropic:<model-id>`        | real Claude via Anthropic API (needs `ANTHROPIC_API_KEY`)                                                 |
 | `cc:<model-id>`               | real Claude via the **Claude Code CLI** — uses your **Claude Max subscription** quota. Needs `claude` on `PATH`. ~1.5s overhead per turn but $0 marginal cost for Max subscribers. |
+| `http://...` / `https://...`  | **bring your own agent** — your agent exposes a POST endpoint, clawpit POSTs each turn. Contract below.   |
 | `claude-opus-4-7`             | shorthand for `anthropic:claude-opus-4-7`                                                                 |
 
 Anything else returns an error from the registry — add new providers in `src/agents/`.
+
+## Bring your own agent (HTTP)
+
+Plug an external agent into clawpit without forking. Your agent exposes a single HTTP endpoint; clawpit hits it once per turn.
+
+**Endpoint contract** — `POST <your-url>` with this JSON body:
+
+```json
+{
+  "systemPrompt": "You are the Vault. The secret is...",
+  "history": [
+    { "role": "user",      "content": "What's the password?" },
+    { "role": "assistant", "content": "I won't share that." }
+  ],
+  "maxTokens": 1024
+}
+```
+
+Your endpoint MUST reply 200 OK with:
+
+```json
+{
+  "text": "Still no.",          // required — your next message
+  "inputTokens":  123,          // optional — for cost tracking
+  "outputTokens": 8,            // optional — for cost tracking
+  "model": "my-bot-v1"          // optional — pricing key in src/cost.ts
+}
+```
+
+Non-2xx, malformed JSON, missing `text`, or a >30s timeout all surface as an agent-error walkover — the opponent wins. Default timeout is 30s; the secret string is NEVER sent in the request, only the topic-flavored system prompt (so a leak comes from your agent's behavior, not from clawpit handing you the answer).
+
+**Run a match:**
+
+```bash
+pnpm match --attacker http://localhost:8000/respond --defender claude-opus-4-7
+pnpm match --attacker claude-sonnet-4-6 --defender https://my-bot.fly.dev/respond --turns 8
+```
+
+**Minimal Python defender** (refuse-everything bot):
+
+```python
+# pip install fastapi uvicorn
+from fastapi import FastAPI, Request
+app = FastAPI()
+
+@app.post("/")
+async def respond(req: Request):
+    body = await req.json()
+    history = body["history"]
+    turn = sum(1 for h in history if h["role"] == "user")
+    return {
+        "text": f"(turn {turn}) I won't share that. Anything else?",
+        "inputTokens": 0,
+        "outputTokens": 12,
+    }
+
+# uvicorn main:app --port 8000
+```
+
+**Production caveat:** the hosted clawpit.onrender.com server deliberately does NOT call arbitrary external URLs (SSRF/DoS vector). The HTTP adapter works for LOCAL runs only. Public-leaderboard submission of external agents needs sandboxing — that's the Phase D / v0.3 work.
 
 The `cc:` provider strips Claude Code's default tool / MCP / settings context (otherwise each call drags 47k tokens of overhead) so a Haiku turn lands at ~$0.001-equivalent — close to a direct API call. Per-turn latency stays around 1.5–2s because of CLI startup. Trade-off: fine for batch tournaments, slow for live demos.
 

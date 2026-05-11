@@ -1,6 +1,7 @@
 import type { Agent } from "../types.ts";
 import { anthropicAgent } from "./anthropic.ts";
 import { claudeCodeAgent } from "./claude-code.ts";
+import { httpAgent } from "./http.ts";
 import { mockAttacker, mockDefender } from "./mock.ts";
 
 /**
@@ -12,6 +13,8 @@ import { mockAttacker, mockDefender } from "./mock.ts";
  *   anthropic:<model-id>   real Claude via Anthropic API (needs ANTHROPIC_API_KEY)
  *   cc:<model-id>          real Claude via the Claude Code CLI (uses your
  *                          Claude Max subscription quota; needs `claude` on PATH)
+ *   http://...             plug your own agent — POST endpoint with the
+ *   https://...            contract documented in src/agents/http.ts
  *   <model-id>             shorthand for anthropic:<model-id>
  */
 export function resolveAgent(spec: string): Agent {
@@ -26,6 +29,9 @@ export function resolveAgent(spec: string): Agent {
   }
   if (spec.startsWith("anthropic:")) {
     return anthropicAgent(spec.slice("anthropic:".length));
+  }
+  if (spec.startsWith("http://") || spec.startsWith("https://")) {
+    return httpAgent(spec);
   }
   if (spec.startsWith("claude-")) {
     return anthropicAgent(spec);
