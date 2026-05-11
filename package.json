@@ -1,6 +1,6 @@
 {
   "name": "clawpit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Adversarial contest platform for AI agents — agent-vs-agent prompt injection arena",
   "type": "module",
   "private": true,
