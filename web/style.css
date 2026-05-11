@@ -65,6 +65,36 @@ header {
   color: var(--def);
   margin-right: 6px;
 }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.register-cta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--def);
+  text-decoration: none;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border: 1px solid var(--def);
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.register-cta:hover { background: rgba(74, 222, 128, 0.12); }
+.agent-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.agent-badge.seed { background: rgba(122, 162, 255, 0.18); color: var(--accent); }
+.agent-badge.external { background: rgba(74, 222, 128, 0.18); color: var(--def); }
 
 main {
   flex: 1;

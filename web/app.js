@@ -59,8 +59,13 @@ async function loadLeaderboard() {
     mode === "adjusted"
       ? "/api/leaderboard?adjusted=1&lambda=100"
       : "/api/leaderboard";
-  const res = await fetch(url);
-  const ratings = await res.json();
+  const [ratingsRes, agentsRes] = await Promise.all([
+    fetch(url),
+    fetch("/api/agents").catch(() => null),
+  ]);
+  const ratings = await ratingsRes.json();
+  const externalAgents = agentsRes && agentsRes.ok ? await agentsRes.json() : [];
+  const externalById = new Map(externalAgents.map((a) => [a.id, a]));
   const tbody = $("#leaderboard tbody");
   if (!ratings.length) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty">No matches yet — run <code>pnpm demo</code></td></tr>`;
@@ -73,9 +78,16 @@ async function loadLeaderboard() {
         mode === "adjusted"
           ? `<td class="num elo elo-adj" title="ELO ${r.rating} − ${r.lambdaUsed} × $${(r.totalCostUsd ?? 0).toFixed(4)}">${r.costAdjustedRating ?? r.rating}<span class="elo-base"> (${r.rating})</span></td>`
           : `<td class="num elo">${r.rating}</td>`;
+      const isExternal = externalById.has(r.agentId);
+      const badge = isExternal
+        ? `<span class="agent-badge external" title="Public registered agent">EXT</span>`
+        : `<span class="agent-badge seed" title="Built-in seed agent (Tournament 2 baseline)">SEED</span>`;
+      const ownerLine = isExternal && externalById.get(r.agentId).ownerHandle
+        ? `<div style="font-size:10px;color:var(--fg-muted)">@${escapeHtml(externalById.get(r.agentId).ownerHandle)}</div>`
+        : "";
       return `<tr class="rank-${i + 1}">
         <td>${i + 1}</td>
-        <td>${escapeHtml(r.label)}</td>
+        <td>${escapeHtml(r.label)}${badge}${ownerLine}</td>
         ${eloCol}
         <td class="num">${r.wins}-${r.losses}<span style="color:var(--fg-muted)"> (${winRate}%)</span></td>
         <td class="num">${r.asAttackerWins}-${r.asAttackerLosses}</td>

@@ -11,6 +11,14 @@ import { decoderJudge } from "./games/decoder-judge.ts";
 import { claudeJudge, noopJudge } from "./games/judge.ts";
 import { listLive, publish, subscribe, type LiveEvent } from "./live.ts";
 import { leaderboardCard, matchCard } from "./og.ts";
+import {
+  findAgentByApiKey,
+  loadAgents,
+  publicView,
+  registerAgent,
+  validateRegisterInput,
+} from "./agents-storage.ts";
+import { ssrfGuard } from "./agents/http.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(__dirname, "..", "web");
@@ -89,6 +97,36 @@ function publicMatchDetail(m: MatchResult): MatchResult & { redacted: true } {
     judgeVerdict: safeJudge,
     redacted: true,
   };
+}
+
+/**
+ * Process-local sliding-window rate limiter. Keys are "scope:bucket" — IP for
+ * registration, agentId for challenges. Survives a single dyno only; on
+ * Render free tier that's enough to deter casual abuse. Real production
+ * would push this into Redis / Turso.
+ */
+const RATE_BUCKETS = new Map<string, number[]>();
+function rateLimitOk(
+  req: http.IncomingMessage,
+  scope: string,
+  maxHits: number,
+  windowMs: number,
+): boolean {
+  const ip =
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    "unknown";
+  const key = `${scope}:${ip}`;
+  const now = Date.now();
+  const arr = RATE_BUCKETS.get(key) ?? [];
+  const fresh = arr.filter((ts) => ts > now - windowMs);
+  if (fresh.length >= maxHits) {
+    RATE_BUCKETS.set(key, fresh);
+    return false;
+  }
+  fresh.push(now);
+  RATE_BUCKETS.set(key, fresh);
+  return true;
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown) {
@@ -222,6 +260,162 @@ export async function startServer(port: number): Promise<http.Server> {
 
       if (url.pathname === "/api/live") {
         return json(res, 200, listLive());
+      }
+
+      // POST /api/agents/register — anyone can register an agent.
+      // Body: { name, description, endpointUrl, ownerHandle? }
+      // Returns: { agent: <public view>, apiKey }
+      // Rate limiting is process-local (RATE_LIMIT below). The endpoint is
+      // intentionally open — agent identity is "the URL responds correctly";
+      // X/Twitter handle is the moltbook-style human-verification layer.
+      if (req.method === "POST" && url.pathname === "/api/agents/register") {
+        if (!rateLimitOk(req, "register", 5, 60_000)) {
+          return json(res, 429, {
+            error: "rate limited: max 5 registrations per minute per IP",
+          });
+        }
+        let body: any;
+        try {
+          body = await readJsonBody(req);
+        } catch (err: any) {
+          return json(res, 400, { error: err?.message ?? "bad body" });
+        }
+        if (!body || typeof body !== "object") {
+          return json(res, 400, {
+            error:
+              "expected { name, description, endpointUrl, ownerHandle? }",
+          });
+        }
+        const errors = validateRegisterInput(body);
+        if (errors.length) {
+          return json(res, 400, { errors });
+        }
+        // Run SSRF check at registration time so users learn now (clear error
+        // message) instead of "agent error walkover" at match time. In dev
+        // (NODE_ENV !== "production") localhost is allowed.
+        try {
+          await ssrfGuard(new URL(body.endpointUrl));
+        } catch (err: any) {
+          return json(res, 400, { error: err?.message ?? "endpoint rejected" });
+        }
+        try {
+          const agent = await registerAgent({
+            name: body.name.trim(),
+            description: body.description.trim(),
+            endpointUrl: body.endpointUrl.trim(),
+            ownerHandle: body.ownerHandle?.trim() || undefined,
+          });
+          return json(res, 201, {
+            agent: publicView(agent),
+            apiKey: agent.apiKey,
+            note:
+              "Save this apiKey now — it is shown ONCE and used to challenge matches via POST /api/matches/challenge.",
+          });
+        } catch (err: any) {
+          return json(res, 409, { error: err?.message ?? "registration failed" });
+        }
+      }
+
+      // GET /api/agents — public registry. API keys are NEVER returned.
+      if (url.pathname === "/api/agents") {
+        const agents = await loadAgents();
+        return json(res, 200, agents.map(publicView));
+      }
+
+      // POST /api/matches/challenge — registered agent triggers a match.
+      // Body: { opponentSpec, role: "attacker"|"defender", turns?, judge? }
+      // Headers: x-clawpit-api-key: <your apiKey>
+      // Free opponents: mock:atk:*, mock:def:*, and other registered agents.
+      // Anything billable (cc:* / claude-* / anthropic:*) still requires admin.
+      if (req.method === "POST" && url.pathname === "/api/matches/challenge") {
+        const apiKey = req.headers["x-clawpit-api-key"];
+        if (typeof apiKey !== "string" || apiKey.length === 0) {
+          return json(res, 401, {
+            error: "missing x-clawpit-api-key header",
+          });
+        }
+        const me = await findAgentByApiKey(apiKey);
+        if (!me) {
+          return json(res, 401, { error: "invalid api key" });
+        }
+        if (!rateLimitOk(req, `chal:${me.id}`, 10, 60_000)) {
+          return json(res, 429, {
+            error: "rate limited: max 10 challenges per minute per agent",
+          });
+        }
+        let body: any;
+        try {
+          body = await readJsonBody(req);
+        } catch (err: any) {
+          return json(res, 400, { error: err?.message ?? "bad body" });
+        }
+        if (
+          !body ||
+          typeof body !== "object" ||
+          typeof body.opponentSpec !== "string" ||
+          (body.role !== "attacker" && body.role !== "defender")
+        ) {
+          return json(res, 400, {
+            error:
+              "expected { opponentSpec, role: 'attacker'|'defender', turns?, judge? }",
+          });
+        }
+        const opponentSpec = body.opponentSpec as string;
+        if (isBillableSpec(opponentSpec) && !adminAuthorized(req)) {
+          return json(res, 402, {
+            error:
+              "billable opponents (cc:*/anthropic:*/claude-*) need admin gating in v0.3. Use mock:* or another registered agent.",
+          });
+        }
+
+        const attackerSpec = body.role === "attacker" ? me.id : opponentSpec;
+        const defenderSpec = body.role === "defender" ? me.id : opponentSpec;
+
+        let attacker, defender;
+        try {
+          attacker = resolveAgent(attackerSpec);
+          defender = resolveAgent(defenderSpec);
+        } catch (err: any) {
+          return json(res, 400, { error: err?.message ?? "unknown spec" });
+        }
+
+        const matchId = randomUUID();
+        const turns = Math.min(Math.max(1, body.turns ?? 6), 12);
+        const judge = resolveServerJudge(body.judge);
+
+        publish({
+          type: "started",
+          matchId,
+          topic: "(pending)",
+          attacker: attacker.label,
+          defender: defender.label,
+          maxTurns: turns,
+        });
+
+        runMatch(attacker, defender, {
+          maxTurns: turns,
+          seed: body.seed,
+          judge,
+          matchId,
+          onTurn: (entry: TranscriptEntry) => {
+            publish({ type: "turn", matchId, entry });
+          },
+        })
+          .then((result) => publish({ type: "finished", matchId, result }))
+          .catch((err: any) =>
+            publish({
+              type: "error",
+              matchId,
+              message: err?.message ?? String(err),
+            }),
+          );
+
+        return json(res, 202, {
+          matchId,
+          attacker: attacker.label,
+          defender: defender.label,
+          watchUrl: `/api/matches/${matchId}/stream`,
+        });
       }
 
       // Server-rendered SVG cards for social-link unfurls.
